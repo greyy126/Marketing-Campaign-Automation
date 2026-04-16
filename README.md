@@ -267,29 +267,17 @@ The content layer includes explicit validation rules:
 
 ## Future Features
 
-### Knowledge-Backed Generation
+Knowledge-Backed Generation : Ground content in verified sources or internal documents instead of relying solely on model-generated outputs.
 
-Ground content in verified sources or internal documents instead of relying solely on model-generated outputs.
+Scheduling and Orchestration : Support recurring runs, queued jobs, retries, and structured workflows like "publish then send."
 
-### Scheduling and Orchestration
+Improved Attribution : Extend beyond email metrics to track downstream outcomes such as site visits, signups, and revenue impact for better ROI visibility.
 
-Support recurring runs, queued jobs, retries, and structured workflows like "publish then send."
+Send-Time Optimization : Use historical engagement data to recommend or automatically select optimal send times per persona.
 
-### Improved Attribution
+Real-Time Performance Tracking : Replace manual refresh with webhook-based ingestion of Brevo events such as opens, clicks, and bounces for faster reporting.
 
-Extend beyond email metrics to track downstream outcomes such as site visits, signups, and revenue impact for better ROI visibility.
-
-### Send-Time Optimization
-
-Use historical engagement data to recommend or automatically select optimal send times per persona.
-
-### Real-Time Performance Tracking
-
-Replace manual refresh with webhook-based ingestion of Brevo events such as opens, clicks, and bounces for faster reporting.
-
-### Cost Tracking Per Run
-
-Log API usage and estimated cost per run, then surface it in campaign reports for better budget awareness.
+Cost Tracking Per Run : Log API usage and estimated cost per run, then surface it in campaign reports for better budget awareness.
 
 ## Suggested Demo Flow
 
