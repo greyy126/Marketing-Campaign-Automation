@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(python -c ':*)",
+      "Bash(python agent.py run --topic \"AI in creative automation\" --mock-ai)",
+      "Bash(python test_content.py)",
+      "Bash(python agent.py run --topic \"AI in creative automation\" --mock-ai --dry-run)",
+      "Bash(python -m pytest test_content.py -q)",
+      "Bash(python agent.py refresh-stats --help)",
+      "Bash(/opt/anaconda3/bin/pip install:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -H \"api-key: e5d89b94ce37c0cb31f350dde38cab0c981266d79373de5274067a3147489451-d5vwXlICLXXbgflN\" https://api.brevo.com/v3/account)",
+      "WebSearch",
+      "Bash(find output:*)",
+      "Bash(rm -f reports/2026-04-13_23-34.md reports/2026-04-14_00-56.md reports/2026-04-14_01-14.md reports/2026-04-14_01-36.md reports/2026-04-14_20-45.md reports/2026-04-14_20-53.md reports/2026-04-14_20-57.md reports/campaign_11.md)",
+      "Bash(python agent.py dashboard --mock-ai)",
+      "Bash(python -c \"import ast, sys; ast.parse\\(open\\('app.py'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")",
+      "Bash(python -c \"import pandas\")",
+      "Bash(python -c \"import streamlit; import app\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app.py'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -c \"import sqlite3; c=sqlite3.connect\\('data/novamind.db'\\); print\\(*[r[0] for r in c.execute\\('SELECT id, topic FROM campaigns ORDER BY id'\\).fetchall\\(\\)], sep='\\\\n'\\)\")",
+      "Bash(python3 agent.py dashboard --mock-ai)",
+      "Bash(python -c \"import sqlite3; conn=sqlite3.connect\\('data/novamind.db'\\); print\\('campaigns:', conn.execute\\('SELECT id,topic,status FROM campaigns'\\).fetchall\\(\\)\\); print\\('metrics count:', conn.execute\\('SELECT COUNT\\(*\\) FROM performance_metrics'\\).fetchone\\(\\)[0]\\)\")"
+    ]
+  }
+}

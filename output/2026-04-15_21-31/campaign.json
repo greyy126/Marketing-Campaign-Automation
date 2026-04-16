@@ -1,0 +1,185 @@
+{
+  "campaign_id": 28,
+  "outline": [
+    {
+      "title": "Your Brand Looks Different Everywhere \u2014 and It's Costing You Clients",
+      "goal": "hook",
+      "persona_relevance": [
+        "Marketing Manager",
+        "Creative Professional",
+        "Agency Founder"
+      ]
+    },
+    {
+      "title": "The Hidden Cost of Brand Inconsistency for Small Agencies",
+      "goal": "pain_point",
+      "persona_relevance": [
+        "Agency Founder",
+        "Marketing Manager"
+      ]
+    },
+    {
+      "title": "What a Cohesive Brand Identity Actually Means Across Channels",
+      "goal": "context",
+      "persona_relevance": [
+        "Creative Professional",
+        "Marketing Manager"
+      ]
+    },
+    {
+      "title": "Agencies That Got It Right: Real Examples of Multi-Channel Brand Consistency",
+      "goal": "proof",
+      "persona_relevance": [
+        "Agency Founder",
+        "Creative Professional",
+        "Marketing Manager"
+      ]
+    },
+    {
+      "title": "Building Your Brand System: The Core Elements That Travel Across Every Channel",
+      "goal": "solution",
+      "persona_relevance": [
+        "Creative Professional",
+        "Agency Founder"
+      ]
+    },
+    {
+      "title": "How to Audit and Align Your Brand Presence in Five Practical Steps",
+      "goal": "how_to",
+      "persona_relevance": [
+        "Marketing Manager",
+        "Creative Professional",
+        "Agency Founder"
+      ]
+    },
+    {
+      "title": "Start Building a Brand That Works Everywhere",
+      "goal": "cta",
+      "persona_relevance": [
+        "Marketing Manager",
+        "Creative Professional",
+        "Agency Founder"
+      ]
+    }
+  ],
+  "blog": {
+    "title": "How to Build a Cohesive Brand Identity Across Channels",
+    "sections": [
+      {
+        "title": "Your Brand Looks Different Everywhere \u2014 and It's Costing You Clients",
+        "goal": "hook",
+        "content": "**Prospects are quietly disqualifying your agency before you ever speak to them.** When your Instagram looks nothing like your website and your proposals use a third visual language, you signal that you cannot manage the very thing clients are hiring you to deliver."
+      },
+      {
+        "title": "The Hidden Cost of Brand Inconsistency for Small Agencies",
+        "goal": "pain_point",
+        "content": "Small agencies lose work not because their output is weak, but because their presence feels unreliable. A mismatched logo color on a pitch deck, a tone shift between your LinkedIn bio and your homepage, a proposal template that predates your rebrand: each gap chips away at perceived credibility.\n\n**Inconsistency is not a design problem; it is a trust problem.** Clients who cannot read a clear, stable identity will default to the larger agency that looks more organized, even if your work is stronger."
+      },
+      {
+        "title": "What a Cohesive Brand Identity Actually Means Across Channels",
+        "goal": "context",
+        "content": "Brand cohesion is not about using the same logo everywhere. It is about maintaining a recognizable voice, visual system, and value proposition whether someone finds you on LinkedIn, reads your case studies, or opens a proposal.\n\n**Each channel has its own format constraints, but your brand's core signal should be immediately legible in all of them.** The agencies that grow fastest treat their brand as a system, not a collection of one-off assets."
+      },
+      {
+        "title": "Agencies That Got It Right: Real Examples of Multi-Channel Brand Consistency",
+        "goal": "proof",
+        "content": "Agencies with tight brand systems share a few observable patterns:\n\n- **A single-page brand guide** governs every touchpoint, from social captions to client-facing decks, so no asset goes rogue.\n- Consistent typography and a locked color palette mean a prospect can move from a cold email to a website to a proposal and feel the same organization throughout.\n- Agencies that standardize their tone across written channels report fewer revision cycles on client deliverables because internal alignment improves alongside external presentation.\n- Small shops that invest in a documented brand system before scaling report faster onboarding for new contractors and freelancers."
+      },
+      {
+        "title": "Building Your Brand System: The Core Elements That Travel Across Every Channel",
+        "goal": "solution",
+        "content": "NovaMind helps small creative agencies build brand systems that hold their shape at scale. The approach centers on four portable elements: a locked visual identity (logo, palette, type), a voice guide with real examples, a template library for recurring formats, and an asset hub every team member can access.\n\n**When these four elements are documented and centralized, brand consistency stops depending on individual memory and starts running as a repeatable process.** NovaMind's workflow automation layers on top of that system so assets are generated and distributed without manual reformatting."
+      },
+      {
+        "title": "How to Audit and Align Your Brand Presence in Five Practical Steps",
+        "goal": "how_to",
+        "content": "A brand audit does not require a consultant. Run through these five steps yourself:\n\n- **Screenshot every active touchpoint** (website, LinkedIn, Instagram, email signature, proposal template) and view them side by side.\n- Flag any inconsistency in color, font, logo version, or tone and log it in a single document.\n- **Identify your most-used asset formats** and build locked templates for each one before touching anything else.\n- Write a one-page voice guide with three to five real examples of on-brand copy and three examples of what to avoid.\n- Assign one person as brand owner and give them authority to reject off-brand assets before they go external."
+      },
+      {
+        "title": "Start Building a Brand That Works Everywhere",
+        "goal": "cta",
+        "content": "Every week you operate with a fragmented brand is a week prospects are forming the wrong impression. **The agencies winning new business right now are not necessarily the most talented; they are the most legible.** Audit your touchpoints today, build the system once, and let it do the selling across every channel. NovaMind is built to help you get there faster. [READ MORE]"
+      }
+    ],
+    "draft": "**Prospects are quietly disqualifying your agency before you ever speak to them.** When your Instagram looks nothing like your website and your proposals use a third visual language, you signal that you cannot manage the very thing clients are hiring you to deliver.\n\nSmall agencies lose work not because their output is weak, but because their presence feels unreliable. A mismatched logo color on a pitch deck, a tone shift between your LinkedIn bio and your homepage, a proposal template that predates your rebrand: each gap chips away at perceived credibility.\n\n**Inconsistency is not a design problem; it is a trust problem.** Clients who cannot read a clear, stable identity will default to the larger agency that looks more organized, even if your work is stronger.\n\nBrand cohesion is not about using the same logo everywhere. It is about maintaining a recognizable voice, visual system, and value proposition whether someone finds you on LinkedIn, reads your case studies, or opens a proposal.\n\n**Each channel has its own format constraints, but your brand's core signal should be immediately legible in all of them.** The agencies that grow fastest treat their brand as a system, not a collection of one-off assets.\n\nAgencies with tight brand systems share a few observable patterns:\n\n- **A single-page brand guide** governs every touchpoint, from social captions to client-facing decks, so no asset goes rogue.\n- Consistent typography and a locked color palette mean a prospect can move from a cold email to a website to a proposal and feel the same organization throughout.\n- Agencies that standardize their tone across written channels report fewer revision cycles on client deliverables because internal alignment improves alongside external presentation.\n- Small shops that invest in a documented brand system before scaling report faster onboarding for new contractors and freelancers.\n\nNovaMind helps small creative agencies build brand systems that hold their shape at scale. The approach centers on four portable elements: a locked visual identity (logo, palette, type), a voice guide with real examples, a template library for recurring formats, and an asset hub every team member can access.\n\n**When these four elements are documented and centralized, brand consistency stops depending on individual memory and starts running as a repeatable process.** NovaMind's workflow automation layers on top of that system so assets are generated and distributed without manual reformatting.\n\nA brand audit does not require a consultant. Run through these five steps yourself:\n\n- **Screenshot every active touchpoint** (website, LinkedIn, Instagram, email signature, proposal template) and view them side by side.\n- Flag any inconsistency in color, font, logo version, or tone and log it in a single document.\n- **Identify your most-used asset formats** and build locked templates for each one before touching anything else.\n- Write a one-page voice guide with three to five real examples of on-brand copy and three examples of what to avoid.\n- Assign one person as brand owner and give them authority to reject off-brand assets before they go external.\n\nEvery week you operate with a fragmented brand is a week prospects are forming the wrong impression. **The agencies winning new business right now are not necessarily the most talented; they are the most legible.** Audit your touchpoints today, build the system once, and let it do the selling across every channel. NovaMind is built to help you get there faster. [READ MORE]",
+    "outline": [
+      {
+        "title": "Your Brand Looks Different Everywhere \u2014 and It's Costing You Clients",
+        "goal": "hook",
+        "persona_relevance": [
+          "Marketing Manager",
+          "Creative Professional",
+          "Agency Founder"
+        ]
+      },
+      {
+        "title": "The Hidden Cost of Brand Inconsistency for Small Agencies",
+        "goal": "pain_point",
+        "persona_relevance": [
+          "Agency Founder",
+          "Marketing Manager"
+        ]
+      },
+      {
+        "title": "What a Cohesive Brand Identity Actually Means Across Channels",
+        "goal": "context",
+        "persona_relevance": [
+          "Creative Professional",
+          "Marketing Manager"
+        ]
+      },
+      {
+        "title": "Agencies That Got It Right: Real Examples of Multi-Channel Brand Consistency",
+        "goal": "proof",
+        "persona_relevance": [
+          "Agency Founder",
+          "Creative Professional",
+          "Marketing Manager"
+        ]
+      },
+      {
+        "title": "Building Your Brand System: The Core Elements That Travel Across Every Channel",
+        "goal": "solution",
+        "persona_relevance": [
+          "Creative Professional",
+          "Agency Founder"
+        ]
+      },
+      {
+        "title": "How to Audit and Align Your Brand Presence in Five Practical Steps",
+        "goal": "how_to",
+        "persona_relevance": [
+          "Marketing Manager",
+          "Creative Professional",
+          "Agency Founder"
+        ]
+      },
+      {
+        "title": "Start Building a Brand That Works Everywhere",
+        "goal": "cta",
+        "persona_relevance": [
+          "Marketing Manager",
+          "Creative Professional",
+          "Agency Founder"
+        ]
+      }
+    ]
+  },
+  "newsletters": [
+    {
+      "persona": "Marketing Manager",
+      "subject": "Brand inconsistency is losing you clients",
+      "body": "Prospects are disqualifying your agency before you ever speak to them. When your Instagram, website, and proposals each look like they came from a different organization, you signal exactly the opposite of what clients are paying you to deliver.\n\nBrand inconsistency is not a design problem. It is a trust problem. A mismatched color on a pitch deck or a tone shift between your LinkedIn bio and homepage chips away at credibility in ways that are hard to recover from.\n\nThe fix is measurable and repeatable. Screenshot every active touchpoint, flag every inconsistency, build locked templates for your most-used formats, and assign one person as brand owner. Agencies that standardize their brand system report fewer revision cycles and faster contractor onboarding.\n\nThe agencies winning new business right now are not the most talented. They are the most legible. Audit your touchpoints today and build the system that does the selling for you.\n\n[READ MORE]"
+    },
+    {
+      "persona": "Creative Professional",
+      "subject": "Build a brand system that runs itself",
+      "body": "When your Instagram looks nothing like your website and your proposals use a third visual language, prospects notice before you get the chance to show your work. Brand cohesion is not about using the same logo everywhere. It is about a recognizable voice, visual system, and value proposition that travels across every channel without manual effort.\n\nThe agencies that get this right operate from four portable elements: a locked visual identity, a voice guide with real examples, a template library for recurring formats, and a centralized asset hub. When those are documented, consistency stops depending on individual memory and starts running as a repeatable process.\n\nYou can start without a consultant. Screenshot every active touchpoint, log every inconsistency, build locked templates first, and assign a brand owner to keep assets on track.\n\nNovaMind layers workflow automation on top of that system so assets are generated and distributed without manual reformatting.\n\n[READ MORE]"
+    },
+    {
+      "persona": "Agency Founder",
+      "subject": "Your brand is costing you deals",
+      "body": "Prospects are quietly disqualifying your agency before a single conversation happens. A mismatched logo on a pitch deck, a tone shift between your LinkedIn bio and your homepage, a proposal template that predates your rebrand: each gap signals that your operation is harder to trust than a larger competitor, even when your output is stronger.\n\nAgencies with tight brand systems scale faster because consistency stops depending on who happens to be working that week. A single-page brand guide, locked templates, and a centralized asset hub mean new contractors onboard faster and client-facing materials stay on brand without your direct involvement.\n\nThe audit takes one afternoon. Screenshot every touchpoint, log every inconsistency, build locked templates for your most-used formats, and assign one person as brand owner with authority to reject off-brand assets.\n\nBuild the system once and let it create leverage across every channel. NovaMind is built to help you get there faster.\n\n[READ MORE]"
+    }
+  ]
+}
