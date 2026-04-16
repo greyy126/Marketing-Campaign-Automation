@@ -127,6 +127,14 @@ def _title_matches_source(source_title: str, page_title: str) -> bool:
     return len(overlap) / len(source_tokens) >= 0.6
 
 
+def _canonical_blog_title(topic: str, fallback: str = "") -> str:
+    """Use the requested topic as the canonical blog title whenever possible."""
+    title = re.sub(r"\s+", " ", (topic or "").strip())
+    if title:
+        return title
+    return re.sub(r"\s+", " ", (fallback or "").strip())
+
+
 def _validate_outline(outline: list) -> None:
     """Raise ValidationError if the structured outline fails any quality gate."""
     if not isinstance(outline, list):
@@ -669,6 +677,7 @@ Writing rules per section:
 - Respond with raw JSON only"""
 
         def _validator(d: dict) -> None:
+            d["title"] = _canonical_blog_title(topic, d.get("title", ""))
             d["outline"] = outline
             _validate_blog(d)
 
@@ -678,6 +687,7 @@ Writing rules per section:
             max_tokens=2000,
             validator=_validator,
         )
+        data["title"] = _canonical_blog_title(topic, data.get("title", ""))
         return data
 
     # ------------------------------------------------------------------
@@ -1067,7 +1077,7 @@ class MockContentGenerator:
         ]
         draft = "\n\n".join(s["content"] for s in sections)
         return {
-            "title"   : "How AI Automation Is Reshaping Small Creative Agencies",
+            "title"   : _canonical_blog_title(topic),
             "outline" : outline,
             "sections": sections,
             "draft"   : draft,

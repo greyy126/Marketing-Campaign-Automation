@@ -92,6 +92,7 @@ for key in ("title", "outline", "sections", "draft"):
     check(key in blog, f"has key '{key}'")
 
 check(len(blog["title"]) <= 60,  f"title <= 60 chars (got {len(blog['title'])})")
+check(blog["title"] == TOPIC, "title matches the requested topic")
 check(blog["outline"] is outline, "blog['outline'] is the passed-in outline object")
 check(len(blog["sections"]) == len(outline),
       f"sections count matches outline ({len(blog['sections'])} == {len(outline)})")

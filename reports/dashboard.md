@@ -1,14 +1,14 @@
 # NovaMind · Campaign Dashboard
 
-_Last updated: 2026-04-16 08:54 UTC_
+_Last updated: 2026-04-16 03:16 PT_
 
 ---
 
 ## Summary
 
-**Total Campaigns:** 7  
+**Total Campaigns:** 10  
 **Best Performing Persona:** Agency Founder  
-**Average Open Rate:** 47.6%
+**Average Open Rate:** 33.3%
 
 ---
 
@@ -16,20 +16,20 @@ _Last updated: 2026-04-16 08:54 UTC_
 
 | Persona | Campaigns | Avg Open% | Avg Click% | Avg Unsub% | Trend |
 |---|---|---|---|---|---|
-| Agency Founder | 7 | 57.1% | 71.4% | 0.00% | down |
-| Creative Professional | 7 | 42.9% | 28.6% | 0.00% | down |
-| Marketing Manager | 7 | 42.9% | 14.3% | 0.00% | down |
+| Agency Founder | 10 | 40.0% | 50.0% | 0.00% | down |
+| Creative Professional | 10 | 30.0% | 20.0% | 0.00% | down |
+| Marketing Manager | 10 | 30.0% | 10.0% | 0.00% | down |
 
 ---
 
 ## Key Signals
 
-- Agency Founder is trending down despite still showing measurable engagement.
-  Why it matters: That segment is not lost, but the current content mix is weakening and needs a sharper next angle before the decline compounds.
-- Creative Professional is trending down despite still showing measurable engagement.
-  Why it matters: That segment is not lost, but the current content mix is weakening and needs a sharper next angle before the decline compounds.
-- Marketing Manager is trending down despite still showing measurable engagement.
-  Why it matters: That segment is not lost, but the current content mix is weakening and needs a sharper next angle before the decline compounds.
+- Agency Founder is trending down despite still showing measurable engagement
+  Why it matters: That segment is not lost, but the current content mix is weakening and needs a sharper next angle before the decline compounds
+- Creative Professional is trending down despite still showing measurable engagement
+  Why it matters: That segment is not lost, but the current content mix is weakening and needs a sharper next angle before the decline compounds
+- Marketing Manager is trending down despite still showing measurable engagement
+  Why it matters: That segment is not lost, but the current content mix is weakening and needs a sharper next angle before the decline compounds
 
 ---
 
@@ -48,5 +48,5 @@ _Last updated: 2026-04-16 08:54 UTC_
 | A practical guide to better improve brand identity | 2026-04-16 | 0.0% | 0.0% | 0.00% | [View](campaign_33.md) |
 | The Agency Guide to Building and Improving Brand Identity at Scale | 2026-04-16 | 0.0% | 0.0% | 0.00% | [View](campaign_32.md) |
 | How to improve brand identity across with AI automation | 2026-04-16 | 0.0% | 0.0% | 0.00% | [View](campaign_31.md) |
-| How to improve brand identity across with AI automation | 2026-04-16 | 100.0% | 100.0% | 0.00% | [View](campaign_30.md) |
-| Maintaining a Consistent Brand Identity Across Every Customer Touchpoint | 2026-04-15 | 66.7% | 100.0% | 0.00% | [View](campaign_29.md) |
+| Workflow Design Strategies That Keep Branding Cohesive at Scale | 2026-04-16 | 0.0% | 0.0% | 0.00% | [View](campaign_44.md) |
+| Using AI Automation to Enforce Brand Voice Across Multi-Channel Campaigns | 2026-04-16 | 0.0% | 0.0% | 0.00% | [View](campaign_43.md) |

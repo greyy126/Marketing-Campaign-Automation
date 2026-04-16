@@ -1,4 +1,4 @@
-# How AI Automation Improves Brand Identity Consistency
+# How to improve brand identity across with AI automation
 _Generated: 2026-04-16_
 
 ---

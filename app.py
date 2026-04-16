@@ -133,25 +133,55 @@ def read_text_file(path: Path) -> str | None:
 
 
 def load_latest_campaign_id() -> int | None:
-    latest_dir = get_latest_output_dir()
-    if latest_dir is None:
-        return None
-    campaign_json = latest_dir / "campaign.json"
-    if not campaign_json.exists():
-        return None
     try:
-        data = json.loads(campaign_json.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+        import sqlite3 as _sqlite3
+
+        db_path = ROOT / "data" / "novamind.db"
+        if not db_path.exists():
+            return None
+        conn = _sqlite3.connect(str(db_path))
+        conn.row_factory = _sqlite3.Row
+        row = conn.execute(
+            """
+            SELECT id
+            FROM campaigns
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        conn.close()
+        if row is None:
+            return None
+        campaign_id = row["id"]
+        return campaign_id if isinstance(campaign_id, int) else None
+    except Exception:
         return None
-    campaign_id = data.get("campaign_id")
-    return campaign_id if isinstance(campaign_id, int) else None
 
 
-def load_campaign_json() -> dict | None:
-    latest_dir = get_latest_output_dir()
-    if latest_dir is None:
+def get_output_dir_for_campaign(campaign_id: int | None) -> Path | None:
+    if campaign_id is None or not OUTPUT_DIR.exists():
         return None
-    campaign_json = latest_dir / "campaign.json"
+
+    for folder in sorted(OUTPUT_DIR.iterdir(), key=lambda p: p.name, reverse=True):
+        if not folder.is_dir():
+            continue
+        campaign_json = folder / "campaign.json"
+        if not campaign_json.exists():
+            continue
+        try:
+            data = json.loads(campaign_json.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        if data.get("campaign_id") == campaign_id:
+            return folder
+    return None
+
+
+def load_campaign_json(campaign_id: int | None = None) -> dict | None:
+    campaign_dir = get_output_dir_for_campaign(campaign_id)
+    if campaign_dir is None:
+        return None
+    campaign_json = campaign_dir / "campaign.json"
     if not campaign_json.exists():
         return None
     try:
@@ -160,12 +190,33 @@ def load_campaign_json() -> dict | None:
         return None
 
 
+def load_campaign_record(campaign_id: int | None) -> dict | None:
+    if campaign_id is None:
+        return None
+    try:
+        import sqlite3 as _sqlite3
+
+        db_path = ROOT / "data" / "novamind.db"
+        if not db_path.exists():
+            return None
+        conn = _sqlite3.connect(str(db_path))
+        conn.row_factory = _sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM campaigns WHERE id=?",
+            (campaign_id,),
+        ).fetchone()
+        conn.close()
+        return dict(row) if row else None
+    except Exception:
+        return None
+
+
 def get_all_runs() -> list[dict]:
     """Scan output/ folders and return run metadata, newest first."""
     if not OUTPUT_DIR.exists():
         return []
     runs = []
-    for folder in sorted(OUTPUT_DIR.iterdir(), key=lambda p: p.name, reverse=True):
+    for folder in OUTPUT_DIR.iterdir():
         if not folder.is_dir():
             continue
         cj = folder / "campaign.json"
@@ -175,17 +226,15 @@ def get_all_runs() -> list[dict]:
             data = json.loads(cj.read_text(encoding="utf-8"))
             campaign_id = data.get("campaign_id")
             blog_title = (data.get("blog") or {}).get("title") or "Untitled"
-            # Format timestamp: "2026-04-15_04-33" → "2026-04-15  04:33"
-            parts = folder.name.split("_")
-            ts_display = (
-                f"{parts[0]}  {parts[1].replace('-', ':')}"
-                if len(parts) == 2
-                else folder.name
-            )
+            # Use file mtime in local time — avoids PT-vs-local timezone confusion
+            mtime = cj.stat().st_mtime
+            local_dt = datetime.fromtimestamp(mtime)
+            ts_display = local_dt.strftime("%Y-%m-%d  %H:%M")
             runs.append(
                 {
                     "folder": folder,
                     "ts_display": ts_display,
+                    "mtime": mtime,
                     "blog_title": blog_title,
                     "campaign_id": campaign_id,
                     "has_blog": (folder / "blog.md").exists(),
@@ -196,6 +245,7 @@ def get_all_runs() -> list[dict]:
             )
         except (json.JSONDecodeError, OSError):
             continue
+    runs.sort(key=lambda r: r["mtime"], reverse=True)
     return runs
 
 
@@ -236,6 +286,7 @@ def init_session_state() -> None:
     st.session_state.setdefault("active_topic", "")
     st.session_state.setdefault("pipeline_started", False)
     st.session_state.setdefault("suggested_topics_refresh_nonce", 0)
+    st.session_state.setdefault("suggested_topics_computed_nonce", -1)
     st.session_state.setdefault("last_suggested_topics", ())
 
 
@@ -955,27 +1006,50 @@ def get_suggested_topic_inputs() -> tuple[str | None, list[str]]:
         return None, []
 
 
+_DOMAIN_SEED_TOPICS = [
+    "How AI Automation Is Reshaping Multi-Channel Marketing",
+    "Building a Scalable Marketing Workflow Without a Larger Team",
+    "Multi-Channel Campaign Automation: What Actually Works",
+    "How to Keep Brand Voice Consistent Across Every Channel",
+    "Why Marketing Workflows Are the Hidden Driver of Brand Growth",
+    "AI-Powered Branding: Consistent Messaging at Scale",
+    "How to Automate Your Marketing Funnel Without Losing the Human Touch",
+    "What a Modern Marketing Automation Stack Should Look Like",
+    "How Small Agencies Win with Automated Multi-Channel Campaigns",
+    "Using AI to Strengthen Brand Identity Across Campaigns",
+    "How to Build a Repeatable Multi-Channel Campaign Strategy",
+    "Marketing Automation 101: Workflows That Save Time and Drive Results",
+]
+
+
 def _fallback_topic_suggestions(persona: str, themes: list[str], variant: int = 0) -> list[str]:
     base_themes = list(themes[:3]) if themes else []
     while len(base_themes) < 3:
         base_themes.append(
-            ["workflow efficiency", "client reporting", "team capacity"][
+            ["marketing automation", "brand consistency", "multi-channel campaigns"][
                 len(base_themes)
             ]
         )
-    templates = [
+    theme_templates = [
         f"How to improve {base_themes[0]} with AI automation",
-        f"A practical guide to better {base_themes[1]}",
+        f"A practical guide to better {base_themes[1]} across every channel",
         f"How small teams can scale {base_themes[2]} without extra overhead",
         f"What high-performing teams get right about {base_themes[0]}",
         f"How to turn {base_themes[1]} into a repeatable growth system",
         f"Why better {base_themes[2]} matters more than adding headcount",
     ]
-    if not templates:
-        return []
-    start = variant % len(templates)
-    ordered = templates[start:] + templates[:start]
-    return ordered[:3]
+    # Interleave domain seeds so suggestions always cover AI automation,
+    # workflows, branding, and multi-channel even when theme data is sparse.
+    start_theme = variant % len(theme_templates)
+    start_seed = variant % len(_DOMAIN_SEED_TOPICS)
+    ordered_theme = theme_templates[start_theme:] + theme_templates[:start_theme]
+    ordered_seed = _DOMAIN_SEED_TOPICS[start_seed:] + _DOMAIN_SEED_TOPICS[:start_seed]
+    # Pick 2 from theme templates and 1 from domain seeds (or vice versa on refresh)
+    if variant % 2 == 0:
+        candidates = ordered_theme[:2] + ordered_seed[:1]
+    else:
+        candidates = ordered_seed[:2] + ordered_theme[:1]
+    return candidates[:3]
 
 
 def _normalize_suggested_topic(topic: str) -> str:
@@ -1024,22 +1098,29 @@ def generate_suggested_topics(
             + "\n"
         )
 
-    prompt = f"""You are refining blog topic titles for NovaMind.
+    prompt = f"""You are generating blog topic suggestions for NovaMind, an AI marketing automation platform.
 
 Top performing persona:
 {persona}
 
-High-performing campaign themes:
+High-performing campaign themes (from past campaigns):
 {", ".join(theme_list)}
+
+NovaMind's core content areas (always consider these as valid angles):
+- AI automation in marketing workflows
+- Multi-channel campaign automation (email, social, CRM)
+- Brand consistency and voice across channels
+- How AI helps small teams compete at scale
+- Marketing workflow design and optimization
+- Branding strategy for agencies and startups
 
 Task:
 - Generate exactly 3 concise, practical blog topic titles
-- Use only the persona and themes above
-- Refine and combine these themes, do not introduce unrelated angles
-- Persona should influence prioritization only, not appear in the titles
-- Write broad blog topics, not persona-targeted headlines or email subject lines
-- Keep each title specific and useful for a marketing content calendar
-- Do not include outdated years; prefer evergreen titles unless a year is necessary
+- Draw from both the high-performing themes above AND NovaMind's core content areas
+- At least one title should touch on AI automation, multi-channel campaigns, branding, or marketing workflows
+- Persona should influence angle and prioritization only, not appear in the titles
+- Write broad blog topics useful for a marketing content calendar, not email subject lines
+- Do not include outdated years; prefer evergreen titles
 - Return a JSON array of 3 strings only
 {refresh_guidance}
 {previous_titles_block}
@@ -1082,16 +1163,24 @@ Task:
     return _fill_suggested_topics(deduped, fallback_topics, list(recent_topics))
 
 
-def render_campaign_caption(campaign_data: dict | None) -> None:
-    if campaign_data is None:
+def render_campaign_caption(campaign_data: dict | None, campaign_record: dict | None = None) -> None:
+    if campaign_data is None and campaign_record is None:
         return
-    cid = campaign_data.get("campaign_id", "?")
-    blog_title = (campaign_data.get("blog") or {}).get("title", "")
-    topic_str = st.session_state.get("active_topic", "")
+    cid = (
+        campaign_data.get("campaign_id")
+        if campaign_data is not None
+        else campaign_record.get("id", "?")
+    )
+    blog_title = (
+        (campaign_data.get("blog") or {}).get("title", "")
+        if campaign_data is not None
+        else (campaign_record or {}).get("blog_title", "")
+    )
+    topic_str = (campaign_record or {}).get("topic", "")
     parts = [f"Campaign #{cid}"]
     if topic_str:
         parts.append(topic_str)
-    if blog_title:
+    if blog_title and blog_title != topic_str:
         parts.append(blog_title)
     st.caption(" · ".join(parts))
 
@@ -1431,9 +1520,10 @@ st.caption(
 )
 
 # Shared state — computed once, referenced across tabs
-latest_output_dir = get_latest_output_dir()
 latest_campaign_id = load_latest_campaign_id()
-campaign_data = load_campaign_json()
+latest_output_dir = get_output_dir_for_campaign(latest_campaign_id)
+campaign_data = load_campaign_json(latest_campaign_id)
+campaign_record = load_campaign_record(latest_campaign_id)
 pipeline_started: bool = st.session_state["pipeline_started"]
 
 tabs = st.tabs(["Run", "Blog", "Newsletters", "Campaign Report", "Dashboard"])
@@ -1454,46 +1544,55 @@ with tabs[0]:
         if st.button("Run Mock Pipeline", use_container_width=True):
             start_pipeline(topic, mock_ai=True)
 
-    top_persona, top_themes = get_suggested_topic_inputs()
-    if top_persona and top_themes:
-        recent_topics = tuple(get_recent_campaign_topics())
-        previous_topics = tuple(st.session_state.get("last_suggested_topics", ()))
-        suggested_topics = generate_suggested_topics(
-            top_persona,
-            tuple(top_themes),
-            recent_topics,
-            previous_topics,
-            int(st.session_state.get("suggested_topics_refresh_nonce", 0)),
+    nonce = int(st.session_state.get("suggested_topics_refresh_nonce", 0))
+    computed_nonce = st.session_state.get("suggested_topics_computed_nonce", -1)
+    existing_topics = st.session_state.get("last_suggested_topics", ())
+    # Only recompute when we have no topics yet, or the user explicitly refreshed.
+    # Never recompute mid-run (st.rerun loop) to prevent topics from flickering.
+    if not existing_topics or nonce != computed_nonce:
+        top_persona, top_themes = get_suggested_topic_inputs()
+        if top_persona and top_themes:
+            recent_topics = tuple(get_recent_campaign_topics())
+            previous_topics = tuple(existing_topics)
+            new_topics = generate_suggested_topics(
+                top_persona,
+                tuple(top_themes),
+                recent_topics,
+                previous_topics,
+                nonce,
+            )
+            if new_topics:
+                st.session_state["last_suggested_topics"] = tuple(new_topics)
+                st.session_state["suggested_topics_computed_nonce"] = nonce
+    suggested_topics = list(st.session_state.get("last_suggested_topics", ()))
+    if suggested_topics:
+        topics_html = "".join(
+            f"<div style='margin-top:0.4rem;'>➡️ {topic}</div>"
+            for topic in suggested_topics[:3]
         )
-        st.session_state["last_suggested_topics"] = tuple(suggested_topics)
-        if suggested_topics:
-            topics_html = "".join(
-                f"<div style='margin-top:0.4rem;'>➡️ {topic}</div>"
-                for topic in suggested_topics[:3]
-            )
-            st.markdown(
-                f"""
-                <div style="
-                    background:#edf4f8;
-                    border:1px solid #d2e0e8;
-                    border-radius:0.6rem;
-                    padding:0.9rem 1rem;
-                    margin-top:0.75rem;
-                    margin-bottom:0.25rem;
-                ">
-                    <div style="font-size:1.05rem; font-weight:600; margin-bottom:0.35rem;">
-                        💡 Suggested Topics (based on past campaign performance)
-                    </div>
-                    {topics_html}
+        st.markdown(
+            f"""
+            <div style="
+                background:#edf4f8;
+                border:1px solid #d2e0e8;
+                border-radius:0.6rem;
+                padding:0.9rem 1rem;
+                margin-top:0.75rem;
+                margin-bottom:0.25rem;
+            ">
+                <div style="font-size:1.05rem; font-weight:600; margin-bottom:0.35rem;">
+                    💡 Suggested Topics (based on past campaign performance)
                 </div>
-                """,
-                unsafe_allow_html=True,
+                {topics_html}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button("Refresh Suggested Topics"):
+            st.session_state["suggested_topics_refresh_nonce"] = (
+                int(st.session_state.get("suggested_topics_refresh_nonce", 0)) + 1
             )
-            if st.button("Refresh Suggested Topics"):
-                st.session_state["suggested_topics_refresh_nonce"] = (
-                    int(st.session_state.get("suggested_topics_refresh_nonce", 0)) + 1
-                )
-                st.rerun()
+            st.rerun()
 
     render_pipeline_status()
 
@@ -1536,12 +1635,30 @@ with tabs[0]:
 
 # ── Blog tab ───────────────────────────────────────────────────────────────────
 with tabs[1]:
-    if not pipeline_started:
+    _is_running = st.session_state.get("active_process") is not None
+    if _is_running:
+        _s = infer_status(st.session_state.get("active_stdout", ""))
+        if _s["newsletters_done"]:
+            # Files are written — safe to show
+            if latest_output_dir is not None:
+                render_campaign_caption(campaign_data, campaign_record)
+                show_markdown_file(latest_output_dir / "blog.md", "Blog not yet saved.")
+            else:
+                st.info("Blog generated — loading...")
+        elif _s["blog_done"]:
+            st.info("Saving blog post...")
+        elif _s["outline_done"]:
+            st.info("Writing blog post...")
+        elif _s["step1_started"]:
+            st.info("Generating outline...")
+        else:
+            st.info("Pipeline starting...")
+    elif not pipeline_started:
         st.warning("⚠️ No active run. Run the pipeline to generate content.")
     elif latest_output_dir is None:
         st.info("No output found.")
     else:
-        render_campaign_caption(campaign_data)
+        render_campaign_caption(campaign_data, campaign_record)
         show_markdown_file(
             latest_output_dir / "blog.md",
             "No blog.md found in the latest output folder.",
@@ -1549,12 +1666,29 @@ with tabs[1]:
 
 # ── Newsletters tab ────────────────────────────────────────────────────────────
 with tabs[2]:
-    if not pipeline_started:
+    _is_running = st.session_state.get("active_process") is not None
+    if _is_running:
+        _s = infer_status(st.session_state.get("active_stdout", ""))
+        if _s["newsletters_done"]:
+            if latest_output_dir is not None:
+                render_campaign_caption(campaign_data, campaign_record)
+                show_markdown_file(latest_output_dir / "newsletters.md", "Newsletters not yet saved.")
+            else:
+                st.info("Newsletters generated — loading...")
+        elif _s["blog_done"]:
+            st.info("Writing newsletters...")
+        elif _s["outline_done"]:
+            st.info("Writing blog post...")
+        elif _s["step1_started"]:
+            st.info("Generating outline...")
+        else:
+            st.info("Pipeline starting...")
+    elif not pipeline_started:
         st.warning("⚠️ No active run. Run the pipeline to generate content.")
     elif latest_output_dir is None:
         st.info("No output found.")
     else:
-        render_campaign_caption(campaign_data)
+        render_campaign_caption(campaign_data, campaign_record)
         show_markdown_file(
             latest_output_dir / "newsletters.md",
             "No newsletters.md found in the latest output folder.",
