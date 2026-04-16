@@ -106,18 +106,6 @@ Performance Analysis
    `- generate dashboard insights and next-topic suggestions
 ```
 
-### Module Responsibilities
-
-- `agent.py`: CLI entry point and end-to-end pipeline orchestration
-- `app.py`: Streamlit UI for running, reviewing, and refreshing the pipeline
-- `src/content_generator.py`: AI generation, validation, campaign summaries, dashboard insights
-- `src/crm_manager.py`: Brevo CRM integration for contacts, lists, and CRM-side audit notes
-- `src/campaign_manager.py`: Brevo email campaign creation and sending
-- `src/performance_tracker.py`: simulated/live metrics, aggregation, dashboard data
-- `src/database.py`: SQLite schema and persistence helpers
-- `src/mock_data.py`: personas, mock contacts, benchmark ranges
-- `src/personas.py`: canonical persona definitions and mapping helpers
-
 ## Tools, APIs, and Models Used
 
 ### Languages and Libraries
@@ -151,100 +139,25 @@ Performance Analysis
 
 This project intentionally uses a few pragmatic shortcuts:
 
-- mock contacts are used instead of a real lead database
-- only three mock contacts are included by default, one per persona
-- simulated performance metrics are generated immediately after send to create a baseline report
-- live Brevo metrics can later replace those simulated values when available
-- newsletters are sent through Brevo, but campaign analytics are also persisted locally in SQLite for historical comparison
-- campaign history informs future generation, reporting, and topic recommendations
-- the Streamlit app launches the CLI as a subprocess instead of duplicating pipeline logic inside the UI
+- The outline is generated first and reused across the blog and persona-specific newsletters to keep content consistent
+- Only three mock contacts are included by default, one per persona
+- Brevo handles contacts, lists, campaigns, and send status, while SQLite stores local history for reporting and comparison
+- Simulated performance metrics are generated immediately after send to create a baseline report and replaced by live Brevo data
+- Campaign history informs future generation, reporting, and topic recommendations
+- Generated content is validated for structure, word count, persona coverage, and formatting rules before downstream use
+- The Streamlit app launches the CLI as a subprocess instead of duplicating pipeline logic inside the UI
 
-## Important Design Choices
-
-### How the Content Pipeline Works
-
-The outline is the control layer for downstream content.
-
-- `generate_outline(topic)` creates 5-7 sections with a `goal` and `persona_relevance`
-- `generate_blog(topic, outline)` writes the blog section-by-section from that outline
-- `generate_newsletters(blog)` produces three persona-specific newsletters based on the relevant outline sections
-
-This means the newsletters are not generic summaries of the whole blog. They are derived from the parts of the outline intended for each audience.
-
-### Personas
+## Personas
 
 The pipeline targets three personas:
 
-| Slug | Display Name | Focus |
-| --- | --- | --- |
-| `agency_founder` | Agency Founder | growth, scaling, leverage |
-| `creative_professional` | Creative Professional | workflow, tools, creative time |
-| `marketing_manager` | Marketing Manager | ROI, efficiency, measurable impact |
 
-### CRM and Logging Behavior
+| Slug                    | Display Name          | Focus                              |
+| ----------------------- | --------------------- | ---------------------------------- |
+| `agency_founder`        | Agency Founder        | growth, scaling, leverage          |
+| `creative_professional` | Creative Professional | workflow, tools, creative time     |
+| `marketing_manager`     | Marketing Manager     | ROI, efficiency, measurable impact |
 
-Brevo is used as the operational CRM and email delivery system.
-
-The pipeline currently:
-
-- creates or reuses persona lists in Brevo
-- upserts mock contacts into those lists
-- creates one Brevo email campaign per persona
-- sends the campaigns
-- fetches campaign status from Brevo
-- creates a CRM-side campaign note in Brevo containing:
-  - topic
-  - blog title
-  - persona
-  - Brevo campaign ID
-  - list ID
-  - status
-  - send date
-
-In addition to the CRM-side record, the app stores campaign metadata and historical metrics locally in SQLite for analysis and reporting.
-
-### Performance Tracking
-
-The pipeline supports two performance modes:
-
-- baseline simulated metrics right after sending
-- live Brevo stat refresh later using `refresh-stats`
-
-Tracked metrics:
-
-- open rate
-- click rate
-- unsubscribe rate
-- total sent
-
-Historical performance is stored in `data/novamind.db` and used in two ways:
-
-- campaign-level AI summaries
-- dashboard-level cross-campaign insights and suggested future topics
-
-### Why Brevo instead of HubSpot?
-
-The assignment allowed HubSpot or a similar CRM. Brevo was used here as the CRM and email-delivery platform because it supports:
-
-- contact management
-- segmentation via lists
-- campaign creation and sending
-- API-driven status checks
-- CRM-side note logging
-
-### Why SQLite?
-
-Brevo is used for operational delivery, but SQLite is better suited for:
-
-- persistent local history
-- campaign-to-campaign comparison
-- dashboard aggregation
-- offline inspection during development
-
-### Why both CLI and UI?
-
-- the CLI is the clean automation entry point
-- the Streamlit app makes the pipeline easy to demo, inspect, and refresh
 
 ## Run via CLI
 
@@ -315,7 +228,7 @@ Tables include:
 
 ## Validation and Quality Controls
 
-The content layer includes explicit validation rules.
+The content layer includes explicit validation rules:
 
 - outline must contain 5-7 sections
 - each section must have valid goals and persona relevance
@@ -323,8 +236,6 @@ The content layer includes explicit validation rules.
 - newsletter bodies must be 120-180 words
 - generated content avoids em dashes
 - blog sections must align with the outline exactly
-
-These checks are designed to make the pipeline more deterministic and less fragile than a pure prompt-only workflow.
 
 ## Repository Structure
 
@@ -354,12 +265,31 @@ These checks are designed to make the pipeline more deterministic and less fragi
     └── novamind.db
 ```
 
-## Known Limitations
+## Future Features
 
-- performance is initially simulated unless refreshed from Brevo later
-- there is no formal scheduler; runs are manually triggered
-- current mock dataset is intentionally small
-- the included test script focuses on content generation behavior, not full end-to-end integration
+### Knowledge-Backed Generation
+
+Ground content in verified sources or internal documents instead of relying solely on model-generated outputs.
+
+### Scheduling and Orchestration
+
+Support recurring runs, queued jobs, retries, and structured workflows like "publish then send."
+
+### Improved Attribution
+
+Extend beyond email metrics to track downstream outcomes such as site visits, signups, and revenue impact for better ROI visibility.
+
+### Send-Time Optimization
+
+Use historical engagement data to recommend or automatically select optimal send times per persona.
+
+### Real-Time Performance Tracking
+
+Replace manual refresh with webhook-based ingestion of Brevo events such as opens, clicks, and bounces for faster reporting.
+
+### Cost Tracking Per Run
+
+Log API usage and estimated cost per run, then surface it in campaign reports for better budget awareness.
 
 ## Suggested Demo Flow
 
@@ -375,5 +305,8 @@ If you are reviewing the project manually, the fastest path is:
 ## Additional Notes
 
 - `docs/ARCHITECTURE.md` contains a concise pipeline summary
+- `prompts/system_prompt.md` contains the reusable system prompt applied to Claude content-generation calls
+- `docs/Claude.md` is a maintainer guide describing the Claude-driven content pipeline, constraints, and editing rules
 - the repo also includes generated outputs and reports from prior runs
 - the app is designed to keep the core pipeline logic in the CLI and use the UI as a thin orchestration layer
+
