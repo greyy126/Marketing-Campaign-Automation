@@ -2,6 +2,8 @@
 
 An end-to-end marketing automation pipeline that generates blogs, sends persona-targeted campaigns via Brevo, and optimizes content using real engagement data.
 
+Demo Walkthrough: https://drive.google.com/file/d/1v-bP_PeSGyTF3xeJuleeMnANA_58PGM5/view?usp=sharing
+
 ## Overview
 
 This project implements a lightweight AI-powered marketing pipeline. Given a blog topic, the system:
