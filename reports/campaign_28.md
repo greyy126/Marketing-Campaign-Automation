@@ -18,20 +18,12 @@ Status: low_confidence
 
 ## Insights
 
-Observation:
-Creative Professional had 100.0% open / 100.0% click vs Marketing Manager at 0.0% open / 0.0% click.
-(Early signal — 1 sends per segment.)
-
-Interpretation:
-Creative Professional showed stronger subject-line resonance. The Marketing Manager subject line may not be addressing that segment's primary concern.
+- Creative Professional is the clearest fit in this send.
+  Why it matters: Creative Professional had 100.0% open / 100.0% click vs Marketing Manager at 0.0% open / 0.0% click, which suggests the subject line and message body were better aligned for that segment.
 
 ---
 
 ## Recommended Actions
 
-- Action: Test a new subject line for Marketing Manager focused on its primary pain point
-  Based on: Creative Professional (100.0%) vs Marketing Manager (0.0%) = 100.0% open rate gap
-
-- Action: Rewrite the Marketing Manager CTA to be more specific to that segment's primary outcome
-  Based on: Creative Professional (100.0%) vs Marketing Manager (0.0%) = 100.0% click rate gap
-
+- Test a new subject line for Marketing Manager focused on its primary pain point -- Creative Professional outperformed Marketing Manager by 100.0% on open rate.
+- Rewrite the Marketing Manager CTA to be more specific to that segment's primary outcome -- Creative Professional outperformed Marketing Manager by 100.0% on click rate.

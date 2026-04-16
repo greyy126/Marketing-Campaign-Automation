@@ -24,12 +24,12 @@ _Last updated: 2026-04-16 08:54 UTC_
 
 ## Key Signals
 
-- Agency Founder is trending down despite still showing measurable engagement
-  Why it matters: That segment is not lost, but the current content mix is weakening and needs a sharper next angle before the decline compounds
-- Creative Professional is trending down despite still showing measurable engagement
-  Why it matters: That segment is not lost, but the current content mix is weakening and needs a sharper next angle before the decline compounds
-- Marketing Manager is trending down despite still showing measurable engagement
-  Why it matters: That segment is not lost, but the current content mix is weakening and needs a sharper next angle before the decline compounds
+- Agency Founder is trending down despite still showing measurable engagement.
+  Why it matters: That segment is not lost, but the current content mix is weakening and needs a sharper next angle before the decline compounds.
+- Creative Professional is trending down despite still showing measurable engagement.
+  Why it matters: That segment is not lost, but the current content mix is weakening and needs a sharper next angle before the decline compounds.
+- Marketing Manager is trending down despite still showing measurable engagement.
+  Why it matters: That segment is not lost, but the current content mix is weakening and needs a sharper next angle before the decline compounds.
 
 ---
 

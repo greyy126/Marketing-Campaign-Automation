@@ -18,11 +18,12 @@ Status: low_confidence
 
 ## Insights
 
-_Early signal only: 1 send(s) per segment, so use these as directional reads._
-
-- **Agency Founder is the clearest fit in this send.** It led both opens and clicks, which suggests the subject line and message body were aligned for that segment.
-- **Creative Professional is dropping out at the top of the funnel.** Other segments opened, but this segment did not, which points to a subject-line or positioning mismatch before the body copy is even seen.
-- **Performance is spread unevenly across segments.** One segment is clearly resonating while another is being left behind, so the current framing is too narrow to travel evenly.
+- Agency Founder is the clearest fit in this send.
+  Why it matters: It led both opens and clicks, which suggests the subject line and message body were aligned for that segment.
+- Creative Professional is dropping out at the top of the funnel.
+  Why it matters: Other segments opened, but this segment did not, which points to a subject-line or positioning mismatch before the body copy is even seen.
+- Performance is spread unevenly across segments.
+  Why it matters: One segment is clearly resonating while another is being left behind, so the current framing is too narrow to travel evenly.
 
 ---
 

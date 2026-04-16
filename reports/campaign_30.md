@@ -18,9 +18,8 @@ Status: low_confidence
 
 ## Insights
 
-_Early signal only: 1 send(s) per segment, so use these as directional reads._
-
-- **Marketing Manager is the clearest fit in this send.** It led both opens and clicks, which suggests the subject line and message body were aligned for that segment.
+- Marketing Manager is the clearest fit in this send.
+  Why it matters: It led both opens and clicks, which suggests the subject line and message body were aligned for that segment.
 
 ---
 
