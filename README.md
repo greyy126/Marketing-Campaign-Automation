@@ -1,4 +1,4 @@
-# NovaMind Marketing Automation Agent
+# NovaMind Marketing Automation Agentic Pipeline
 
 An end-to-end marketing automation pipeline that generates blogs, sends persona-targeted campaigns via Brevo, and optimizes content using real engagement data.
 
