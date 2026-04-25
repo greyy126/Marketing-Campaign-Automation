@@ -36,9 +36,9 @@ MOCK_CONTACTS = [
         "persona": "agency_founder",
     },
     {
-        "email": "hanschemicalspl@gmail.com",
-        "firstName": "Hans",
-        "lastName": "Chemicals",
+        "email": "pictures.gresha@gmail.com",
+        "firstName": "Sai",
+        "lastName": "Nandhan",
         "persona": "creative_professional",
     },
     {

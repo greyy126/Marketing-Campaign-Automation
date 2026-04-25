@@ -1,11 +1,9 @@
 """
-Brevo email campaign creation and (simulated) dispatch.
+Brevo email campaign creation and dispatch.
 
-Why simulated?
-  Brevo requires all recipient emails to be real opt-in addresses before
-  an actual send.  Our mock contacts use fictional domains, so we create
-  the campaign object in Brevo (giving us a real campaign ID to log) but
-  skip the sendNow call and instead record status as 'simulated'.
+Campaigns are created in Brevo and sent via sendNow to real contacts.
+Engagement metrics (opens, clicks, unsubscribes) are simulated locally
+by the performance tracker — Brevo's analytics are not polled in real time.
 """
 
 import requests

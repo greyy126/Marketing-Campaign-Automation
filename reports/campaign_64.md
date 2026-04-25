@@ -1,5 +1,5 @@
-# Campaign Report — How to improve brand identity across with AI automation
-_Campaign #31 · How to improve brand identity across with AI automation · Sent 2026-04-16 · Last refreshed 2026-04-16 04:11 UTC_
+# Campaign Report — Multi-Channel Campaign Automation: The Agency Blueprint for Scalable Brand Cohesion
+_Campaign #64 · Multi-Channel Campaign Automation: The Agency Blueprint for Scalable Brand Cohesion · Sent 2026-04-25 · Last refreshed 2026-04-25 02:38 PT_
 
 ---
 

@@ -23,7 +23,7 @@ from rich import box
 from rich.rule import Rule
 from src.personas import DISPLAY_TO_SLUG, persona_label
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
 console = Console()
 PT = ZoneInfo("America/Los_Angeles")
@@ -65,18 +65,10 @@ def _require_env(key: str) -> str:
 
 # ── Output helpers ─────────────────────────────────────────────────────────────
 
-def _save_output(content: dict, campaign_id: int) -> Path:
-    out_dir = Path("output") / _pt_now().strftime("%Y-%m-%d_%H-%M")
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    blog_post        = content["blog"]
-    newsletters_list = content["newsletters"]   # [{ persona, subject, body }, ...]
-
-    # Blog markdown — hook as bold pre-header, then max 3 ## sections, no ###
+def _write_blog_md(out_dir: Path, blog_post: dict) -> None:
     blog_path = out_dir / "blog.md"
     sections  = blog_post.get("sections", [])
 
-    # Groups rendered as ## blocks (order matters; proof merges into problem group)
     CONTENT_GROUPS = [
         ["pain_point", "context", "proof"],
         ["solution", "how_to"],
@@ -95,7 +87,6 @@ def _save_output(content: dict, campaign_id: int) -> Path:
         "",
     ]
 
-    # Opening hook — bold paragraph before any ## headers
     for s in sections_by_goal.get("hook", []):
         hook_content = s["content"]
         if not hook_content.strip().startswith("**"):
@@ -104,7 +95,6 @@ def _save_output(content: dict, campaign_id: int) -> Path:
             hook_content = "\n\n".join(paras)
         blog_lines += [hook_content, "", "---", ""]
 
-    # Main ## sections — content merged directly, no ### sub-headings
     cta_content = None
     assigned: set[str] = {"hook"}
 
@@ -127,7 +117,6 @@ def _save_output(content: dict, campaign_id: int) -> Path:
 
         blog_lines += ["---", ""]
 
-    # Catch any unmatched goals
     for s in sections:
         if s.get("goal") not in assigned:
             blog_lines += [f"## {s['title']}", "", s["content"], "", "---", ""]
@@ -143,7 +132,8 @@ def _save_output(content: dict, campaign_id: int) -> Path:
 
     blog_path.write_text("\n".join(blog_lines))
 
-    # Newsletters markdown (uses display persona names)
+
+def _write_newsletters_md(out_dir: Path, newsletters_list: list) -> None:
     nl_path  = out_dir / "newsletters.md"
     nl_lines = ["# Newsletters\n"]
     for nl in newsletters_list:
@@ -155,7 +145,33 @@ def _save_output(content: dict, campaign_id: int) -> Path:
         ]
     nl_path.write_text("\n".join(nl_lines))
 
-    # Full JSON snapshot
+
+def _find_output_dir(campaign_id: int) -> Path | None:
+    output_root = Path("output")
+    if not output_root.exists():
+        return None
+    for folder in output_root.iterdir():
+        if not folder.is_dir():
+            continue
+        cj = folder / "campaign.json"
+        if not cj.exists():
+            continue
+        try:
+            data = json.loads(cj.read_text(encoding="utf-8"))
+            if data.get("campaign_id") == campaign_id:
+                return folder
+        except Exception:
+            continue
+    return None
+
+
+def _save_output(content: dict, campaign_id: int) -> Path:
+    out_dir = Path("output") / _pt_now().strftime("%Y-%m-%d_%H-%M")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    _write_blog_md(out_dir, content["blog"])
+    _write_newsletters_md(out_dir, content["newsletters"])
+
     json_path = out_dir / "campaign.json"
     json_path.write_text(json.dumps({"campaign_id": campaign_id, **content}, indent=2))
 
@@ -528,7 +544,7 @@ def run(topic: str, dry_run: bool, mock_ai: bool):
     _sent_ids      = {c["id"] for c in _all_campaigns}
     _all_metrics   = [r for r in db.get_all_campaign_metrics() if r["campaign_id"] in _sent_ids]
     _dash_data     = build_dashboard_data(_all_metrics)
-    _dash_insights = MockContentGenerator().generate_dashboard_insights(_dash_data) if _all_metrics else ""
+    _dash_insights = gen.generate_dashboard_insights(_dash_data) if _all_metrics else ""
     _dash_path     = _save_dashboard_report(_all_campaigns, _dash_data, _dash_insights)
     console.print(f"  [dim]Dashboard updated → {_dash_path}[/]")
 
@@ -684,6 +700,277 @@ def dashboard(mock_ai: bool):
 
     report_path = _save_dashboard_report(campaigns, dashboard_data, insights)
     console.print(f"\n  [dim]Dashboard saved → {report_path}[/]")
+
+
+@cli.command("generate-blog")
+@click.option("--topic", required=True, help="Blog topic")
+@click.option("--mock-ai", is_flag=True, default=False)
+@click.option("--feedback", default="", help="User feedback for content iteration")
+def generate_blog_cmd(topic: str, mock_ai: bool, feedback: str):
+    """Generate blog outline and post only. Used by the UI approval flow."""
+    if not mock_ai:
+        anthropic_key = _require_env("ANTHROPIC_API_KEY")
+
+    from src import database as db
+    from src.content_generator import ContentGenerator, MockContentGenerator
+
+    db.init_db()
+
+    historical_context = _build_historical_context(db.get_all_campaign_metrics())
+    if feedback.strip():
+        feedback_block = f"User feedback on previous content: {feedback.strip()}"
+        historical_context = (
+            feedback_block + ("\n\n" + historical_context if historical_context else "")
+        )
+
+    console.print(Rule("[bold cyan]Step 1 · AI Content Generation[/]"))
+    if mock_ai:
+        console.print("  [yellow]--mock-ai active — skipping Claude API calls[/]")
+        gen = MockContentGenerator()
+    else:
+        gen = ContentGenerator(api_key=anthropic_key)
+
+    console.print(f"  Generating blog post for: [italic]{topic}[/]")
+    outline   = gen.generate_outline(topic, historical_context=historical_context)
+    blog_post = gen.generate_blog(topic, outline)
+
+    console.print(f"  [green]✓[/] Outline: {len(outline)} sections")
+    for item in outline:
+        console.print(f"    [dim]{item['goal']:12}[/] {item['title']}")
+    console.print(
+        f"  [green]✓[/] Blog: [bold]{blog_post['title']}[/] "
+        f"[dim]({len(blog_post['draft'].split())} words)[/]"
+    )
+
+    campaign_id = db.save_campaign(
+        topic        = topic,
+        blog_title   = blog_post["title"],
+        blog_draft   = blog_post["draft"],
+        blog_outline = json.dumps(outline),
+    )
+
+    out_dir = Path("output") / _pt_now().strftime("%Y-%m-%d_%H-%M")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    _write_blog_md(out_dir, blog_post)
+
+    (out_dir / "campaign.json").write_text(
+        json.dumps({"campaign_id": campaign_id, "outline": outline, "blog": blog_post}, indent=2)
+    )
+
+    console.print(f"\n  [dim]Blog saved → {out_dir}[/]")
+    console.print(f"CAMPAIGN_ID: {campaign_id}")
+
+
+@cli.command("generate-newsletters")
+@click.option("--campaign-id", required=True, type=int)
+@click.option("--mock-ai", is_flag=True, default=False)
+@click.option("--feedback", default="", help="User feedback for newsletter iteration")
+def generate_newsletters_cmd(campaign_id: int, mock_ai: bool, feedback: str):
+    """Generate newsletters for an existing blog campaign. Used by the UI approval flow."""
+    if not mock_ai:
+        anthropic_key = _require_env("ANTHROPIC_API_KEY")
+
+    from src import database as db
+    from src.content_generator import ContentGenerator, MockContentGenerator
+
+    db.init_db()
+
+    out_dir = _find_output_dir(campaign_id)
+    if out_dir is None:
+        console.print(f"[bold red]Error:[/] Output directory for campaign #{campaign_id} not found.")
+        sys.exit(1)
+
+    cj_data   = json.loads((out_dir / "campaign.json").read_text(encoding="utf-8"))
+    blog_post = cj_data["blog"]
+
+    historical_context = _build_historical_context(db.get_all_campaign_metrics())
+    if feedback.strip():
+        feedback_block = f"User feedback on previous newsletters: {feedback.strip()}"
+        historical_context = (
+            feedback_block + ("\n\n" + historical_context if historical_context else "")
+        )
+
+    console.print(Rule("[bold cyan]Generating Newsletters[/]"))
+    if mock_ai:
+        console.print("  [yellow]--mock-ai active — skipping Claude API calls[/]")
+        gen = MockContentGenerator()
+    else:
+        gen = ContentGenerator(api_key=anthropic_key)
+
+    newsletters_result = gen.generate_newsletters(blog_post, historical_context=historical_context)
+    newsletters_list   = newsletters_result["newsletters"]
+
+    for nl in newsletters_list:
+        console.print(f"  [green]✓[/] Newsletter → {nl['persona']}")
+
+    _write_newsletters_md(out_dir, newsletters_list)
+
+    cj_data["newsletters"] = newsletters_list
+    (out_dir / "campaign.json").write_text(json.dumps(cj_data, indent=2))
+
+    console.print(f"\n  [dim]Newsletters saved → {out_dir}[/]")
+    console.print("NEWSLETTERS_SAVED")
+
+
+@cli.command("distribute")
+@click.option("--campaign-id", required=True, type=int)
+@click.option("--mock-ai", is_flag=True, default=False)
+def distribute_cmd(campaign_id: int, mock_ai: bool):
+    """Distribute an approved campaign via Brevo (CRM + send + metrics)."""
+    brevo_key = _require_env("BREVO_API_KEY")
+    if not mock_ai:
+        anthropic_key = _require_env("ANTHROPIC_API_KEY")
+
+    from src import database as db
+    from src.content_generator  import ContentGenerator, MockContentGenerator
+    from src.crm_manager        import CRMManager
+    from src.campaign_manager   import CampaignManager
+    from src.performance_tracker import simulate_metrics
+    from src.mock_data          import MOCK_CONTACTS, PERSONAS
+
+    db.init_db()
+
+    campaign = db.get_campaign(campaign_id)
+    if not campaign:
+        console.print(f"[bold red]Error:[/] Campaign #{campaign_id} not found.")
+        sys.exit(1)
+
+    out_dir = _find_output_dir(campaign_id)
+    if out_dir is None:
+        console.print(f"[bold red]Error:[/] Output directory for campaign #{campaign_id} not found.")
+        sys.exit(1)
+
+    cj_data          = json.loads((out_dir / "campaign.json").read_text(encoding="utf-8"))
+    blog_post        = cj_data["blog"]
+    newsletters_list = cj_data.get("newsletters", [])
+
+    if not newsletters_list:
+        console.print(f"[bold red]Error:[/] No newsletters found. Run generate-newsletters first.")
+        sys.exit(1)
+
+    topic       = campaign["topic"]
+    newsletters = {
+        DISPLAY_TO_SLUG[nl["persona"]]: {"subject": nl["subject"], "body": nl["body"]}
+        for nl in newsletters_list
+        if nl["persona"] in DISPLAY_TO_SLUG
+    }
+
+    # ── Step 2: CRM setup ─────────────────────────────────────────────────────
+    console.print(Rule("[bold cyan]Step 2 · CRM & Segmentation[/]"))
+    crm = CRMManager(api_key=brevo_key)
+
+    account      = crm.get_account()
+    sender_email = account["email"]
+    console.print(f"  Brevo account: [bold]{account.get('companyName', sender_email)}[/] ({sender_email})")
+
+    console.print("  Setting up persona lists …")
+    list_ids = crm.setup_persona_lists(PERSONAS)
+    for slug, lid in list_ids.items():
+        console.print(f"  [green]✓[/] List [{lid}] → {slug}")
+
+    console.print(f"  Upserting {len(MOCK_CONTACTS)} mock contacts …")
+    count = crm.upsert_contacts_bulk(MOCK_CONTACTS, list_ids)
+    console.print(f"  [green]✓[/] {count} contacts synced to Brevo")
+
+    # ── Step 3: Create & send campaigns ───────────────────────────────────────
+    console.print(Rule("[bold cyan]Step 3 · Campaign Creation[/]"))
+    camp_mgr = CampaignManager(api_key=brevo_key, sender_email=sender_email)
+
+    brevo_campaign_ids = camp_mgr.create_all_campaigns(
+        newsletters         = newsletters,
+        list_ids_by_persona = list_ids,
+        blog_title          = blog_post["title"],
+        personas_meta       = PERSONAS,
+    )
+
+    for persona, newsletter in newsletters.items():
+        brevo_id = brevo_campaign_ids[persona]
+        db.save_newsletter(
+            campaign_id       = campaign_id,
+            persona           = persona,
+            subject           = newsletter["subject"],
+            body              = newsletter["body"],
+            brevo_campaign_id = brevo_id,
+            brevo_list_id     = list_ids[persona],
+            crm_status        = "draft",
+        )
+        console.print(f"  [green]✓[/] Campaign #{brevo_id} created → {persona}")
+
+    console.print("  Sending campaigns …")
+    camp_mgr.send_all_campaigns(brevo_campaign_ids)
+    for persona, brevo_id in brevo_campaign_ids.items():
+        state = camp_mgr.get_campaign_state(brevo_id)
+        db.update_newsletter_crm_state(campaign_id, persona, **state)
+        try:
+            crm.log_campaign_note(
+                topic              = topic,
+                blog_title         = blog_post["title"],
+                persona_slug       = persona,
+                persona_label      = PERSONAS[persona]["label"],
+                brevo_campaign_id  = brevo_id,
+                brevo_list_id      = list_ids.get(persona),
+                crm_status         = state.get("crm_status"),
+                crm_sent_at        = state.get("crm_sent_at"),
+                crm_status_reason  = state.get("crm_status_reason"),
+            )
+        except Exception as exc:
+            console.print(f"  [yellow]![/] CRM note logging failed for {persona}: {exc}")
+        console.print(
+            f"  [green]✓[/] {persona} → Brevo #{brevo_id} status: "
+            f"{state.get('crm_status') or 'unknown'}"
+        )
+
+    db.mark_campaign_sent(campaign_id)
+    console.print(f"\n  [dim]Emails dispatched to real contacts via Brevo[/]")
+    console.print(_newsletter_status_table(db.get_newsletters_for_campaign(campaign_id)))
+
+    # ── Step 4: Baseline metrics ───────────────────────────────────────────────
+    console.print(Rule("[bold cyan]Step 4 · Baseline Metrics[/]"))
+    gen = MockContentGenerator() if mock_ai else ContentGenerator(api_key=anthropic_key)
+    metrics = simulate_metrics(campaign_id, seed=campaign_id, brevo_api_key=brevo_key)
+
+    table = Table(box=box.SIMPLE_HEAD, show_header=True, header_style="bold magenta")
+    table.add_column("Persona",  style="cyan",  min_width=25)
+    table.add_column("Sent",     justify="right")
+    table.add_column("Opens",    justify="right")
+    table.add_column("Clicks",   justify="right")
+    table.add_column("Open %",   justify="right", style="green")
+    table.add_column("Click %",  justify="right", style="green")
+    table.add_column("Unsub %",  justify="right", style="yellow")
+
+    for m in metrics:
+        table.add_row(
+            _persona_label(m["persona"]),
+            str(m["total_sent"]),
+            str(m["opens"]),
+            str(m["clicks"]),
+            f"{m['open_rate']:.1%}",
+            f"{m['click_rate']:.1%}",
+            f"{m['unsubscribe_rate']:.2%}",
+        )
+    console.print(table)
+
+    console.print("  Generating initial campaign report …")
+    summary_result = gen.generate_performance_summary(metrics, blog_post["title"])
+    report_path = _save_report(
+        summary_result, metrics,
+        campaign_id = campaign_id,
+        blog_title  = blog_post["title"],
+        topic       = topic,
+        sent_at     = db.get_campaign(campaign_id).get("sent_at"),
+    )
+    console.print(f"  [dim]Campaign report saved → {report_path}[/]")
+
+    from src.performance_tracker import build_dashboard_data
+    _all_campaigns = [c for c in db.get_all_campaigns() if c["status"] == "sent"]
+    _sent_ids      = {c["id"] for c in _all_campaigns}
+    _all_metrics   = [r for r in db.get_all_campaign_metrics() if r["campaign_id"] in _sent_ids]
+    _dash_data     = build_dashboard_data(_all_metrics)
+    _dash_insights = gen.generate_dashboard_insights(_dash_data) if _all_metrics else ""
+    _dash_path     = _save_dashboard_report(_all_campaigns, _dash_data, _dash_insights)
+    console.print(f"  [dim]Dashboard updated → {_dash_path}[/]")
+
+    console.print(Rule("[bold green]Pipeline complete ✓[/]"))
 
 
 if __name__ == "__main__":

@@ -106,6 +106,77 @@ def inject_css() -> None:
             color: #888;
             margin-top: 0.1rem;
         }
+
+        /* Approval flow — stepper */
+        .stepper {
+            display: flex;
+            margin: 0.8rem 0 0.6rem 0;
+            border: 1px solid rgba(49,51,63,0.1);
+            border-radius: 0.6rem;
+            overflow: hidden;
+            background: #fafafa;
+        }
+        .stepper-step {
+            flex: 1;
+            padding: 0.8rem 1rem;
+            border-right: 1px solid rgba(49,51,63,0.08);
+        }
+        .stepper-step:last-child { border-right: none; }
+        .stepper-step.s-active   { background: #eff6ff; }
+        .stepper-step.s-done     { background: #f0fdf4; }
+        .stepper-step.s-awaiting { background: #fffbeb; }
+        .stepper-step.s-pending  { background: #fafafa; }
+        .stepper-seq {
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #9ca3af;
+            margin-bottom: 0.18rem;
+        }
+        .stepper-name {
+            font-size: 0.86rem;
+            font-weight: 700;
+            margin-bottom: 0.22rem;
+            color: #111;
+        }
+        .stepper-name.s-pending { color: #9ca3af; }
+        .stepper-badge {
+            font-size: 0.72rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+        }
+        .stepper-badge.s-pending  { color: #9ca3af; }
+        .stepper-badge.s-active   { color: #2563eb; }
+        .stepper-badge.s-awaiting { color: #d97706; }
+        .stepper-badge.s-done     { color: #16a34a; }
+        .stepper-feedback {
+            font-size: 0.78rem;
+            color: #6b7280;
+            margin: 0.3rem 0 0.8rem 0;
+            min-height: 1.1rem;
+        }
+
+        /* Approval flow — step action panel */
+        .step-panel {
+            border: 1px solid rgba(49,51,63,0.12);
+            border-radius: 0.6rem;
+            padding: 1.1rem 1.2rem;
+            margin: 0.25rem 0 1rem 0;
+            background: #fafafa;
+        }
+        .step-panel-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 0.15rem;
+        }
+        .step-panel-sub {
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-bottom: 0.9rem;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -211,10 +282,11 @@ def load_campaign_record(campaign_id: int | None) -> dict | None:
         return None
 
 
-def get_all_runs() -> list[dict]:
-    """Scan output/ folders and return run metadata, newest first."""
+def get_all_runs(hidden_campaign_ids: set[int] | None = None) -> list[dict]:
+    """Return completed historical runs, newest first."""
     if not OUTPUT_DIR.exists():
         return []
+    hidden_campaign_ids = hidden_campaign_ids or set()
     runs = []
     for folder in OUTPUT_DIR.iterdir():
         if not folder.is_dir():
@@ -225,6 +297,20 @@ def get_all_runs() -> list[dict]:
         try:
             data = json.loads(cj.read_text(encoding="utf-8"))
             campaign_id = data.get("campaign_id")
+            if not isinstance(campaign_id, int) or campaign_id in hidden_campaign_ids:
+                continue
+
+            campaign_record = load_campaign_record(campaign_id)
+            if not campaign_record:
+                continue
+            if campaign_record.get("status") != "sent" or not campaign_record.get("sent_at"):
+                continue
+
+            has_blog = (folder / "blog.md").exists()
+            has_newsletters = (folder / "newsletters.md").exists()
+            if not (has_blog and has_newsletters):
+                continue
+
             blog_title = (data.get("blog") or {}).get("title") or "Untitled"
             # Use file mtime in local time — avoids PT-vs-local timezone confusion
             mtime = cj.stat().st_mtime
@@ -237,10 +323,9 @@ def get_all_runs() -> list[dict]:
                     "mtime": mtime,
                     "blog_title": blog_title,
                     "campaign_id": campaign_id,
-                    "has_blog": (folder / "blog.md").exists(),
-                    "has_newsletters": (folder / "newsletters.md").exists(),
-                    "has_report": bool(campaign_id)
-                    and (REPORTS_DIR / f"campaign_{campaign_id}.md").exists(),
+                    "has_blog": has_blog,
+                    "has_newsletters": has_newsletters,
+                    "has_report": (REPORTS_DIR / f"campaign_{campaign_id}.md").exists(),
                 }
             )
         except (json.JSONDecodeError, OSError):
@@ -288,6 +373,13 @@ def init_session_state() -> None:
     st.session_state.setdefault("suggested_topics_refresh_nonce", 0)
     st.session_state.setdefault("suggested_topics_computed_nonce", -1)
     st.session_state.setdefault("last_suggested_topics", ())
+    st.session_state.setdefault("pipeline_stage", "idle")
+    st.session_state.setdefault("pending_campaign_id", None)
+    st.session_state.setdefault("pending_mock_ai", False)
+    st.session_state.setdefault("distribute_completed", False)
+    st.session_state.setdefault("session_campaign_ids", set())
+    st.session_state.setdefault("cached_previous_runs", None)
+    st.session_state.setdefault("pipeline_error", None)
 
 
 # ── UI helpers ─────────────────────────────────────────────────────────────────
@@ -1306,19 +1398,40 @@ def render_dashboard_tab() -> None:
 # ── Pipeline control ───────────────────────────────────────────────────────────
 
 
-def start_pipeline(topic: str, mock_ai: bool) -> None:
-    if not topic.strip():
-        st.error("Enter a topic before running the pipeline.")
-        return
-    if st.session_state["active_process"] is not None:
-        st.warning("A pipeline run is already in progress.")
-        return
+def _friendly_error(raw: str) -> str:
+    """Convert raw subprocess stderr/stdout into a short, human-readable message."""
+    if not raw:
+        return "Unknown error. Check that your .env file is configured correctly."
+    low = raw.lower()
+    if "authentication_error" in low or "invalid x-api-key" in low or "authenticationerror" in low:
+        return (
+            "Invalid Anthropic API key (401). "
+            "Open your .env file and set ANTHROPIC_API_KEY to a valid key from console.anthropic.com."
+        )
+    if "brevo" in low and ("401" in raw or "unauthorized" in low):
+        return (
+            "Invalid Brevo API key. "
+            "Open your .env file and set BREVO_API_KEY to your Brevo API key."
+        )
+    if "contentvalidationerror" in low or "validation" in low and "words" in low:
+        # Extract just the validation message line, not the full traceback
+        for line in raw.splitlines():
+            if "ContentValidationError" in line or ("words" in line and ("must" in line or "between" in line)):
+                return f"Content validation failed: {line.strip()}"
+        return "Content validation failed. The AI response did not meet quality constraints — try again."
+    if "missing env var" in low:
+        for line in raw.splitlines():
+            if "Missing env var" in line:
+                return line.strip()
+        return "Missing environment variable. Check your .env file."
+    if "ratelimit" in low or "rate_limit" in low or "529" in raw:
+        return "Anthropic API rate limit hit. Wait a moment and try again."
+    # Fallback: show only the last meaningful error line, not the full traceback
+    lines = [ln.strip() for ln in raw.splitlines() if ln.strip() and not ln.strip().startswith("File ") and "Traceback" not in ln]
+    return lines[-1] if lines else raw[:300]
 
-    cmd = [sys.executable, "agent.py", "run", "--topic", topic.strip()]
-    label = "Run Mock Pipeline" if mock_ai else "Run Pipeline"
-    if mock_ai:
-        cmd.append("--mock-ai")
 
+def _launch_subprocess(cmd: list, label: str, mock_ai: bool, topic: str = "") -> None:
     proc = subprocess.Popen(
         cmd,
         cwd=ROOT,
@@ -1334,22 +1447,77 @@ def start_pipeline(topic: str, mock_ai: bool) -> None:
     threading.Thread(
         target=enqueue_stream, args=(proc.stderr, output_queue, "stderr"), daemon=True
     ).start()
+    updates = {
+        "last_run_mode":        "mock" if mock_ai else "live",
+        "last_command_result":  None,
+        "last_command_label":   label,
+        "last_pipeline_result": None,
+        "active_process":       proc,
+        "active_queue":         output_queue,
+        "active_stdout":        "",
+        "active_stderr":        "",
+        "active_label":         label,
+        "pipeline_started":     True,
+    }
+    if topic:
+        updates["active_topic"] = topic
+    st.session_state.update(updates)
 
-    st.session_state.update(
-        {
-            "last_run_mode": "mock" if mock_ai else "live",
-            "last_command_result": None,
-            "last_command_label": label,
-            "last_pipeline_result": None,
-            "active_process": proc,
-            "active_queue": output_queue,
-            "active_stdout": "",
-            "active_stderr": "",
-            "active_label": label,
-            "active_topic": topic.strip(),
-            "pipeline_started": True,
-        }
-    )
+
+def start_pipeline(topic: str, mock_ai: bool) -> None:
+    if not topic.strip():
+        st.error("Enter a topic before running the pipeline.")
+        return
+    if st.session_state["active_process"] is not None:
+        st.warning("A pipeline run is already in progress.")
+        return
+    cmd = [sys.executable, "agent.py", "run", "--topic", topic.strip()]
+    if mock_ai:
+        cmd.append("--mock-ai")
+    _launch_subprocess(cmd, "Run Mock Pipeline" if mock_ai else "Run Pipeline", mock_ai, topic.strip())
+
+
+def start_blog_generation(topic: str, mock_ai: bool, feedback: str = "") -> None:
+    if not topic.strip():
+        st.error("Enter a topic before running the pipeline.")
+        return
+    if st.session_state["active_process"] is not None:
+        st.warning("A pipeline run is already in progress.")
+        return
+    cmd = [sys.executable, "agent.py", "generate-blog", "--topic", topic.strip()]
+    if mock_ai:
+        cmd.append("--mock-ai")
+    if feedback.strip():
+        cmd += ["--feedback", feedback.strip()]
+    st.session_state["pipeline_stage"]       = "generating_blog"
+    st.session_state["pending_mock_ai"]      = mock_ai
+    st.session_state["distribute_completed"] = False
+    st.session_state["pipeline_error"]       = None
+    _launch_subprocess(cmd, "Generating Blog", mock_ai, topic.strip())
+
+
+def start_newsletter_generation(campaign_id: int, mock_ai: bool, feedback: str = "") -> None:
+    if st.session_state["active_process"] is not None:
+        st.warning("A pipeline run is already in progress.")
+        return
+    cmd = [sys.executable, "agent.py", "generate-newsletters", "--campaign-id", str(campaign_id)]
+    if mock_ai:
+        cmd.append("--mock-ai")
+    if feedback.strip():
+        cmd += ["--feedback", feedback.strip()]
+    st.session_state["pipeline_stage"] = "generating_newsletters"
+    _launch_subprocess(cmd, "Generating Newsletters", mock_ai)
+
+
+def start_distribution(campaign_id: int, mock_ai: bool) -> None:
+    if st.session_state["active_process"] is not None:
+        st.warning("A pipeline run is already in progress.")
+        return
+    cmd = [sys.executable, "agent.py", "distribute", "--campaign-id", str(campaign_id)]
+    if mock_ai:
+        cmd.append("--mock-ai")
+    st.session_state["pipeline_stage"] = "distributing"
+    _launch_subprocess(cmd, "Distributing Campaign", mock_ai)
 
 
 def poll_pipeline() -> None:
@@ -1378,15 +1546,42 @@ def poll_pipeline() -> None:
         key = "active_stdout" if stream_name == "stdout" else "active_stderr"
         st.session_state[key] += line
 
+    stdout = st.session_state["active_stdout"]
     st.session_state["last_command_result"] = {
         "returncode": proc.returncode,
-        "stdout": st.session_state["active_stdout"],
+        "stdout": stdout,
         "stderr": st.session_state["active_stderr"],
     }
-    st.session_state["last_command_label"] = st.session_state.get("active_label")
+    st.session_state["last_command_label"]   = st.session_state.get("active_label")
     st.session_state["last_pipeline_result"] = dict(st.session_state["last_command_result"])
-    st.session_state["active_process"] = None
-    st.session_state["active_queue"] = None
+    st.session_state["active_process"]       = None
+    st.session_state["active_queue"]         = None
+
+    # Stage transitions for the approval flow
+    stage = st.session_state.get("pipeline_stage", "idle")
+    if proc.returncode == 0:
+        st.session_state["pipeline_error"] = None
+        if stage == "generating_blog":
+            for line in stdout.splitlines():
+                if line.startswith("CAMPAIGN_ID:"):
+                    try:
+                        campaign_id = int(line.split(":")[1].strip())
+                        st.session_state["pending_campaign_id"] = campaign_id
+                        st.session_state["session_campaign_ids"].add(campaign_id)
+                    except ValueError:
+                        pass
+            st.session_state["pipeline_stage"] = "awaiting_blog_approval"
+        elif stage == "generating_newsletters":
+            st.session_state["pipeline_stage"] = "awaiting_newsletter_approval"
+        elif stage == "distributing":
+            st.session_state["pipeline_stage"]       = "idle"
+            st.session_state["distribute_completed"] = True
+    else:
+        # Subprocess failed — reset stage so user can retry
+        stderr = st.session_state.get("active_stderr", "")
+        raw = stderr.strip() or stdout.strip() or ""
+        st.session_state["pipeline_error"] = _friendly_error(raw)
+        st.session_state["pipeline_stage"] = "idle"
 
 
 # ── Pipeline status widget ─────────────────────────────────────────────────────
@@ -1394,13 +1589,16 @@ def poll_pipeline() -> None:
 
 def infer_status(stdout: str) -> dict[str, bool]:
     return {
-        "step1_started": "Step 1 · AI Content Generation" in stdout,
-        "outline_done": "Outline:" in stdout,
-        "blog_done": "Blog:" in stdout,
-        "newsletters_done": "Content saved" in stdout,
-        "step2_done": "contacts synced to Brevo" in stdout,
-        "step3_done": "Emails dispatched to real contacts via Brevo" in stdout,
-        "step4_started": "Step 4 · Baseline Metrics" in stdout,
+        "step1_started":        "Step 1 · AI Content Generation" in stdout,
+        "outline_done":         "Outline:" in stdout,
+        "blog_done":            "Blog:" in stdout,
+        "newsletters_done":     "Content saved" in stdout,
+        "step2_done":           "contacts synced to Brevo" in stdout,
+        "step3_done":           "Emails dispatched to real contacts via Brevo" in stdout,
+        "step4_started":        "Step 4 · Baseline Metrics" in stdout,
+        "blog_gen_done":        "CAMPAIGN_ID:" in stdout,
+        "newsletters_gen_done": "NEWSLETTERS_SAVED" in stdout,
+        "distribute_done":      "Pipeline complete" in stdout,
     }
 
 
@@ -1413,54 +1611,106 @@ def _indicator(done: bool, label: str, in_progress: bool = False) -> str:
 
 
 def render_pipeline_status() -> None:
-    active_stdout = st.session_state.get("active_stdout", "")
-    is_running = st.session_state.get("active_process") is not None
-    run_result = st.session_state.get("last_pipeline_result")
+    active_stdout  = st.session_state.get("active_stdout", "")
+    is_running     = st.session_state.get("active_process") is not None
+    run_result     = st.session_state.get("last_pipeline_result")
+    stage          = st.session_state.get("pipeline_stage", "idle")
+    dist_completed = st.session_state.get("distribute_completed", False)
 
-    if not is_running and run_result is None:
+    in_approval_flow = stage != "idle" or dist_completed
+    if not is_running and run_result is None and not in_approval_flow:
         return
 
-    source_stdout = active_stdout if is_running else str(run_result.get("stdout", ""))
+    source_stdout = active_stdout if is_running else str((run_result or {}).get("stdout", ""))
     s = infer_status(source_stdout)
 
-    outline_ip = s["step1_started"] and not s["outline_done"]
-    blog_ip = s["outline_done"] and not s["blog_done"]
-    newsletters_ip = s["blog_done"] and not s["newsletters_done"]
-    step2_ip = s["newsletters_done"] and not s["step2_done"]
-    step3_ip = s["step2_done"] and not s["step3_done"]
-    step4_ip = s["step3_done"] and is_running
+    # Stage-based completion truth (crosses subprocess boundaries)
+    _past_blog = stage in ("generating_newsletters", "awaiting_newsletter_approval", "distributing") or dist_completed
+    _past_nl   = stage == "distributing" or dist_completed
+    _await_blog = stage == "awaiting_blog_approval"
+    _await_nl   = stage == "awaiting_newsletter_approval"
 
-    status_html = f"""
-    <div class="pipeline-card">
-        <h4>Pipeline Status</h4>
-        <div class="pipeline-step">
-            <strong>Step 1 &middot; AI Content Generation</strong>
-            <div>{_indicator(s["outline_done"], "Outline generated", outline_ip)}</div>
-            <div>{_indicator(s["blog_done"], "Blog generated", blog_ip)}</div>
-            <div>{_indicator(s["newsletters_done"], "Newsletters generated", newsletters_ip)}</div>
-        </div>
-        <div class="pipeline-step">
-            <strong>Step 2 &middot; CRM Setup</strong>
-            <div>{_indicator(s["step2_done"], "Contacts synced", step2_ip)}</div>
-        </div>
-        <div class="pipeline-step">
-            <strong>Step 3 &middot; Campaign Creation</strong>
-            <div>{_indicator(s["step3_done"], "Campaigns created", step3_ip)}</div>
-        </div>
-        <div class="pipeline-step">
-            <strong>Step 4 &middot; Performance</strong>
-            <div>{_indicator(False, "Waiting for engagement data...", step4_ip)}</div>
-        </div>
-        <div class="pipeline-hints">
-            <span>Refresh stats to view results</span>
-            <span>View campaign report in the Campaign Report tab</span>
-        </div>
-    </div>
-    """
+    _outline_done     = s["outline_done"]    or _past_blog or _await_blog
+    _blog_done        = s["blog_done"]       or _past_blog or _await_blog
+    _newsletters_done = s["newsletters_done"] or s["newsletters_gen_done"] or _past_nl or _await_nl
+    _step2_done       = s["step2_done"]      or dist_completed
+    _step3_done       = s["step3_done"]      or dist_completed
+
+    # In-progress guards per subprocess type
+    _is_full_run  = is_running and stage == "idle"
+    _is_blog_gen  = is_running and stage == "generating_blog"
+    _is_nl_gen    = is_running and stage == "generating_newsletters"
+    _is_dist      = is_running and stage == "distributing"
+
+    outline_ip    = (_is_blog_gen or _is_full_run) and s["step1_started"] and not _outline_done
+    blog_ip       = (_is_blog_gen or _is_full_run) and _outline_done and not _blog_done
+    newsletters_ip = (_is_nl_gen or _is_full_run) and _blog_done and not _newsletters_done
+    step2_ip      = (_is_dist or _is_full_run) and _newsletters_done and not _step2_done
+    step3_ip      = (_is_dist or _is_full_run) and _step2_done and not _step3_done
+    step4_ip      = (_is_dist or _is_full_run) and _step3_done and is_running
+
+    # Approval indicator lines for Step 1
+    blog_approval_html = ""
+    if _await_blog:
+        blog_approval_html = "<div style='padding-left:0.6rem;color:#b45309;'>&#8594; Awaiting blog approval</div>"
+    elif _past_blog:
+        blog_approval_html = "<div style='padding-left:0.6rem;color:#16a34a;'>&#10003; Blog approved</div>"
+
+    nl_approval_html = ""
+    if _await_nl:
+        nl_approval_html = "<div style='padding-left:0.6rem;color:#b45309;'>&#8594; Awaiting newsletter approval</div>"
+    elif _past_nl:
+        nl_approval_html = "<div style='padding-left:0.6rem;color:#16a34a;'>&#10003; Newsletters approved</div>"
+
+    _parts = [
+        '<div class="pipeline-card">',
+        "<h4>Pipeline Status</h4>",
+        '<div class="pipeline-step">',
+        "<strong>Step 1 &middot; AI Content Generation</strong>",
+        f"<div>{_indicator(_outline_done, 'Outline generated', outline_ip)}</div>",
+        f"<div>{_indicator(_blog_done, 'Blog generated', blog_ip)}</div>",
+    ]
+    if blog_approval_html:
+        _parts.append(blog_approval_html)
+    _parts.append(f"<div>{_indicator(_newsletters_done, 'Newsletters generated', newsletters_ip)}</div>")
+    if nl_approval_html:
+        _parts.append(nl_approval_html)
+    _parts += [
+        "</div>",
+        '<div class="pipeline-step">',
+        "<strong>Step 2 &middot; CRM Setup</strong>",
+        f"<div>{_indicator(_step2_done, 'Contacts synced', step2_ip)}</div>",
+        "</div>",
+        '<div class="pipeline-step">',
+        "<strong>Step 3 &middot; Campaign Creation</strong>",
+        f"<div>{_indicator(_step3_done, 'Campaigns created', step3_ip)}</div>",
+        "</div>",
+        '<div class="pipeline-step">',
+        "<strong>Step 4 &middot; Performance</strong>",
+        f"<div>{_indicator(False, 'Waiting for engagement data...', step4_ip)}</div>",
+        "</div>",
+        '<div class="pipeline-hints">',
+        "<span>Refresh stats to view results</span>",
+        "<span>View campaign report in the Campaign Report tab</span>",
+        "</div>",
+        "</div>",
+    ]
+    status_html = "".join(_parts)
 
     if is_running:
         st.markdown(status_html, unsafe_allow_html=True)
-    else:
+    elif dist_completed:
+        dist_stdout = str((run_result or {}).get("stdout", ""))
+        any_suspended = "suspended" in dist_stdout.lower()
+        if any_suspended:
+            st.warning("Some campaigns may be suspended in Brevo — check your Brevo dashboard.")
+        else:
+            st.success("Campaign sent successfully.")
+        with st.expander("Pipeline details", expanded=False):
+            st.markdown(status_html, unsafe_allow_html=True)
+    elif in_approval_flow:
+        st.markdown(status_html, unsafe_allow_html=True)
+    elif run_result is not None:
         if int(run_result["returncode"]) == 0:
             st.success("Pipeline completed successfully.")
         else:
@@ -1530,25 +1780,20 @@ tabs = st.tabs(["Run", "Blog", "Newsletters", "Campaign Report", "Dashboard"])
 
 # ── Run tab ────────────────────────────────────────────────────────────────────
 with tabs[0]:
-    st.markdown("#### Start a New Run")
-    topic = st.text_input(
-        "Topic",
-        placeholder='e.g. "AI in creative automation"',
-        label_visibility="collapsed",
-    )
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Run Pipeline", use_container_width=True):
-            start_pipeline(topic, mock_ai=False)
-    with col2:
-        if st.button("Run Mock Pipeline", use_container_width=True):
-            start_pipeline(topic, mock_ai=True)
+    _stage           = st.session_state.get("pipeline_stage", "idle")
+    _pending_id      = st.session_state.get("pending_campaign_id")
+    _pending_mock_ai = st.session_state.get("pending_mock_ai", False)
+    _is_active       = st.session_state.get("active_process") is not None
+    _dist_completed  = st.session_state.get("distribute_completed", False)
+    _current_topic   = st.session_state.get("active_topic", "")
+
+    # ── Topic input ────────────────────────────────────────────────────────────
+    _pipeline_active  = _stage != "idle" or _is_active or _dist_completed
+    _input_locked     = _pipeline_active and not _dist_completed
 
     nonce = int(st.session_state.get("suggested_topics_refresh_nonce", 0))
     computed_nonce = st.session_state.get("suggested_topics_computed_nonce", -1)
     existing_topics = st.session_state.get("last_suggested_topics", ())
-    # Only recompute when we have no topics yet, or the user explicitly refreshed.
-    # Never recompute mid-run (st.rerun loop) to prevent topics from flickering.
     if not existing_topics or nonce != computed_nonce:
         top_persona, top_themes = get_suggested_topic_inputs()
         if top_persona and top_themes:
@@ -1565,22 +1810,35 @@ with tabs[0]:
                 st.session_state["last_suggested_topics"] = tuple(new_topics)
                 st.session_state["suggested_topics_computed_nonce"] = nonce
     suggested_topics = list(st.session_state.get("last_suggested_topics", ()))
+
+    st.markdown("#### Start a New Run")
+    topic = st.text_input(
+        "Topic",
+        value=_current_topic if _input_locked else "",
+        placeholder='e.g. "AI in creative automation"',
+        label_visibility="collapsed",
+        disabled=_input_locked,
+    )
+    if not _pipeline_active or _dist_completed:
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Run Pipeline", use_container_width=True):
+                start_blog_generation(topic, mock_ai=False)
+        with col2:
+            if st.button("Run Mock Pipeline", use_container_width=True):
+                start_blog_generation(topic, mock_ai=True)
+
     if suggested_topics:
         topics_html = "".join(
-            f"<div style='margin-top:0.4rem;'>➡️ {topic}</div>"
-            for topic in suggested_topics[:3]
+            f"<div style='margin-top:0.4rem;'>➡️ {t}</div>"
+            for t in suggested_topics[:3]
         )
+        margin_top = "0.75rem" if not _pipeline_active else "0.5rem"
         st.markdown(
             f"""
-            <div style="
-                background:#edf4f8;
-                border:1px solid #d2e0e8;
-                border-radius:0.6rem;
-                padding:0.9rem 1rem;
-                margin-top:0.75rem;
-                margin-bottom:0.25rem;
-            ">
-                <div style="font-size:1.05rem; font-weight:600; margin-bottom:0.35rem;">
+            <div style="background:#edf4f8;border:1px solid #d2e0e8;border-radius:0.6rem;
+                        padding:0.9rem 1rem;margin-top:{margin_top};margin-bottom:0.25rem;">
+                <div style="font-size:1.05rem;font-weight:600;margin-bottom:0.35rem;">
                     💡 Suggested Topics (based on past campaign performance)
                 </div>
                 {topics_html}
@@ -1588,7 +1846,7 @@ with tabs[0]:
             """,
             unsafe_allow_html=True,
         )
-        if st.button("Refresh Suggested Topics"):
+        if not _pipeline_active and st.button("Refresh Suggested Topics"):
             st.session_state["suggested_topics_refresh_nonce"] = (
                 int(st.session_state.get("suggested_topics_refresh_nonce", 0)) + 1
             )
@@ -1596,10 +1854,67 @@ with tabs[0]:
 
     render_pipeline_status()
 
-    # Previous runs
+    # ── Pipeline error recovery ────────────────────────────────────────────────
+    _pipeline_error = st.session_state.get("pipeline_error")
+    if _pipeline_error and not _is_active:
+        with st.expander("Pipeline error — click to expand", expanded=True):
+            st.error("The pipeline step failed. Check the error below, then retry.")
+            st.code(_pipeline_error, language="text")
+        if st.button("Clear Error & Start New Run", type="primary"):
+            st.session_state["pipeline_error"] = None
+            st.session_state["pipeline_stage"] = "idle"
+            st.session_state["distribute_completed"] = False
+            st.session_state["cached_previous_runs"] = None
+            st.rerun()
+
+    # ── Approval panels ────────────────────────────────────────────────────────
+
+    # Awaiting blog approval
+    if _stage == "awaiting_blog_approval" and not _is_active:
+        _blog_feedback = st.text_input(
+            "Feedback for redo (optional)",
+            placeholder="e.g. make the tone more conversational, focus more on ROI...",
+            key="blog_feedback_input",
+        )
+        _col1, _col2 = st.columns(2)
+        with _col1:
+            if st.button("Approve & Generate Newsletters", use_container_width=True, type="primary"):
+                start_newsletter_generation(_pending_id, _pending_mock_ai)
+                st.rerun()
+        with _col2:
+            if st.button("Redo Blog", use_container_width=True):
+                start_blog_generation(_current_topic, _pending_mock_ai, feedback=_blog_feedback)
+                st.rerun()
+
+    # Awaiting newsletter approval
+    elif _stage == "awaiting_newsletter_approval" and not _is_active:
+        _nl_feedback = st.text_input(
+            "Feedback for redo (optional)",
+            placeholder="e.g. make the Agency Founder newsletter more concise...",
+            key="newsletter_feedback_input",
+        )
+        _col1, _col2 = st.columns(2)
+        with _col1:
+            if st.button("Approve & Send Campaign", use_container_width=True, type="primary"):
+                start_distribution(_pending_id, _pending_mock_ai)
+                st.rerun()
+        with _col2:
+            if st.button("Redo Newsletters", use_container_width=True):
+                start_newsletter_generation(_pending_id, _pending_mock_ai, feedback=_nl_feedback)
+                st.rerun()
+
+    # Previous runs — always visible
     st.divider()
     st.markdown("#### Previous Runs")
-    all_runs = get_all_runs()
+    if st.session_state["cached_previous_runs"] is None:
+        session_campaign_ids = {
+            cid for cid in st.session_state.get("session_campaign_ids", set())
+            if isinstance(cid, int)
+        }
+        st.session_state["cached_previous_runs"] = get_all_runs(
+            hidden_campaign_ids=session_campaign_ids
+        )
+    all_runs = st.session_state["cached_previous_runs"]
     if not all_runs:
         st.caption("No previous runs found.")
     else:
@@ -1635,11 +1950,25 @@ with tabs[0]:
 
 # ── Blog tab ───────────────────────────────────────────────────────────────────
 with tabs[1]:
-    _is_running = st.session_state.get("active_process") is not None
-    if _is_running:
+    _tab_stage   = st.session_state.get("pipeline_stage", "idle")
+    _tab_pending = st.session_state.get("pending_campaign_id")
+    _is_running  = st.session_state.get("active_process") is not None
+
+    if _tab_stage == "awaiting_blog_approval" and not _is_running:
+        st.warning("⏸ Awaiting your approval — review the blog below, then return to the **Run** tab to approve or redo.")
+        _tab_out_dir = get_output_dir_for_campaign(_tab_pending)
+        if _tab_out_dir:
+            render_campaign_caption(load_campaign_json(_tab_pending), load_campaign_record(_tab_pending))
+            show_markdown_file(_tab_out_dir / "blog.md", "Blog not found.")
+    elif _tab_stage in ("awaiting_newsletter_approval",) and not _is_running:
+        st.info("Blog approved. Review the newsletters in the **Newsletters** tab.")
+        _tab_out_dir = get_output_dir_for_campaign(_tab_pending)
+        if _tab_out_dir:
+            render_campaign_caption(load_campaign_json(_tab_pending), load_campaign_record(_tab_pending))
+            show_markdown_file(_tab_out_dir / "blog.md", "Blog not found.")
+    elif _is_running:
         _s = infer_status(st.session_state.get("active_stdout", ""))
-        if _s["newsletters_done"]:
-            # Files are written — safe to show
+        if _s["newsletters_done"] or _s["blog_gen_done"]:
             if latest_output_dir is not None:
                 render_campaign_caption(campaign_data, campaign_record)
                 show_markdown_file(latest_output_dir / "blog.md", "Blog not yet saved.")
@@ -1653,6 +1982,8 @@ with tabs[1]:
             st.info("Generating outline...")
         else:
             st.info("Pipeline starting...")
+    elif st.session_state.get("pipeline_error"):
+        st.error("Pipeline failed — no new content to show. Fix the error in the **Run** tab and try again.")
     elif not pipeline_started:
         st.warning("⚠️ No active run. Run the pipeline to generate content.")
     elif latest_output_dir is None:
@@ -1666,16 +1997,27 @@ with tabs[1]:
 
 # ── Newsletters tab ────────────────────────────────────────────────────────────
 with tabs[2]:
-    _is_running = st.session_state.get("active_process") is not None
-    if _is_running:
+    _tab_stage   = st.session_state.get("pipeline_stage", "idle")
+    _tab_pending = st.session_state.get("pending_campaign_id")
+    _is_running  = st.session_state.get("active_process") is not None
+
+    if _tab_stage == "awaiting_blog_approval" and not _is_running:
+        st.warning("⏸ Awaiting blog approval — approve the blog in the **Run** tab first before newsletters are generated.")
+    elif _tab_stage == "awaiting_newsletter_approval" and not _is_running:
+        st.warning("⏸ Awaiting your approval — review the newsletters below, then return to the **Run** tab to approve or redo.")
+        _tab_out_dir = get_output_dir_for_campaign(_tab_pending)
+        if _tab_out_dir:
+            render_campaign_caption(load_campaign_json(_tab_pending), load_campaign_record(_tab_pending))
+            show_markdown_file(_tab_out_dir / "newsletters.md", "Newsletters not found.")
+    elif _is_running:
         _s = infer_status(st.session_state.get("active_stdout", ""))
-        if _s["newsletters_done"]:
+        if _s["newsletters_gen_done"]:
             if latest_output_dir is not None:
                 render_campaign_caption(campaign_data, campaign_record)
                 show_markdown_file(latest_output_dir / "newsletters.md", "Newsletters not yet saved.")
             else:
                 st.info("Newsletters generated — loading...")
-        elif _s["blog_done"]:
+        elif _s["blog_gen_done"] or _s["blog_done"]:
             st.info("Writing newsletters...")
         elif _s["outline_done"]:
             st.info("Writing blog post...")
@@ -1683,6 +2025,8 @@ with tabs[2]:
             st.info("Generating outline...")
         else:
             st.info("Pipeline starting...")
+    elif st.session_state.get("pipeline_error"):
+        st.error("Pipeline failed — no new content to show. Fix the error in the **Run** tab and try again.")
     elif not pipeline_started:
         st.warning("⚠️ No active run. Run the pipeline to generate content.")
     elif latest_output_dir is None:

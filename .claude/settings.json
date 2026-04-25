@@ -21,7 +21,16 @@
       "Bash(python3 -c ' *)",
       "Bash(python3 -c \"import sqlite3; c=sqlite3.connect\\('data/novamind.db'\\); print\\(*[r[0] for r in c.execute\\('SELECT id, topic FROM campaigns ORDER BY id'\\).fetchall\\(\\)], sep='\\\\n'\\)\")",
       "Bash(python3 agent.py dashboard --mock-ai)",
-      "Bash(python -c \"import sqlite3; conn=sqlite3.connect\\('data/novamind.db'\\); print\\('campaigns:', conn.execute\\('SELECT id,topic,status FROM campaigns'\\).fetchall\\(\\)\\); print\\('metrics count:', conn.execute\\('SELECT COUNT\\(*\\) FROM performance_metrics'\\).fetchone\\(\\)[0]\\)\")"
+      "Bash(python -c \"import sqlite3; conn=sqlite3.connect\\('data/novamind.db'\\); print\\('campaigns:', conn.execute\\('SELECT id,topic,status FROM campaigns'\\).fetchall\\(\\)\\); print\\('metrics count:', conn.execute\\('SELECT COUNT\\(*\\) FROM performance_metrics'\\).fetchone\\(\\)[0]\\)\")",
+      "Bash(python -c \"import app\")",
+      "Bash(python -c \"import agent\")",
+      "Bash(python agent.py --help)",
+      "Bash(python -m py_compile app.py)",
+      "Bash(python -c \"import os; from dotenv import load_dotenv; print\\('Before load_dotenv:', repr\\(os.environ.get\\('ANTHROPIC_API_KEY', 'NOT SET'\\)[:20] if os.environ.get\\('ANTHROPIC_API_KEY'\\) else 'NOT SET'\\)\\); load_dotenv\\(\\); print\\('After load_dotenv:', repr\\(os.environ.get\\('ANTHROPIC_API_KEY', 'NOT SET'\\)[:20]\\)\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(python agent.py generate-blog --topic \"test\")",
+      "Bash(python -c \"from src.content_generator import MockContentGenerator; g=MockContentGenerator\\(\\); c=g.generate_content\\('x'\\); print\\(c['blog']['title']\\)\")",
+      "Bash(python -c \"import sqlite3; conn=sqlite3.connect\\('data/novamind.db'\\); print\\([r[0] for r in conn.execute\\(\\\\\"SELECT name FROM sqlite_master WHERE type='table'\\\\\"\\).fetchall\\(\\)]\\)\")"
     ]
   }
 }
