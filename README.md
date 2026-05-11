@@ -3,6 +3,7 @@
 An end-to-end marketing automation pipeline that generates blogs, sends persona-targeted campaigns via Brevo, and optimizes content using real engagement data.
 
 Demo Walkthrough: https://drive.google.com/file/d/1v-bP_PeSGyTF3xeJuleeMnANA_58PGM5/view?usp=sharing
+Feature added - human in the loop - https://drive.google.com/file/d/12XhsyMKSXodPtdIBsv43jfLp4oXbC90C/view?usp=drive_link
 
 ## Overview
 
