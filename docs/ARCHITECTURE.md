@@ -8,7 +8,14 @@ User runs: python agent.py run --topic "..."
 ├── Step 1: Content Generation (Claude AI)
 │   ├── generate_outline()     → 5-7 structured sections (goal + persona tags)
 │   ├── generate_blog()        → 400-600 word post, section-by-section
+│   │       └── [GATE 1] User reviews blog in Blog tab
+│   │               ├── Approve → proceed to newsletters
+│   │               └── Redo → re-run generate-blog with optional feedback text
+│   │
 │   └── generate_newsletters() → 3 persona-specific emails (120-180 words each)
+│           └── [GATE 2] User reviews newsletters in Newsletters tab
+│                   ├── Approve → proceed to distribution
+│                   └── Redo → re-run generate-newsletters with optional feedback text
 │
 ├── Step 2: CRM Setup (Brevo)
 │   ├── Create/find persona lists (Agency Founder, Creative Professional, Marketing Manager)

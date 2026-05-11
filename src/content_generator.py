@@ -163,6 +163,10 @@ def _validate_outline(outline: list) -> None:
             )
 
 
+def _sanitize_em_dashes(text: str) -> str:
+    return re.sub(r'\s*—\s*', ' - ', text)
+
+
 def _validate_blog(blog: dict) -> None:
     """Raise ValidationError if the blog fails any quality gate."""
     for key in ("title", "outline", "sections", "draft"):
@@ -170,9 +174,6 @@ def _validate_blog(blog: dict) -> None:
             raise ValidationError(f"Blog JSON missing required key: '{key}'.")
 
     draft = blog["draft"]
-    if EM_DASH_RE.search(draft):
-        raise ValidationError("Blog draft contains an em dash. Rewrite without em dashes.")
-
     word_count = len(draft.split())
     if not (400 <= word_count <= 600):
         raise ValidationError(
@@ -220,7 +221,8 @@ def _validate_newsletters(result: dict) -> None:
         body    = nl.get("body", "")
 
         if EM_DASH_RE.search(body):
-            raise ValidationError(f"Newsletter '{persona}' contains an em dash.")
+            body = _sanitize_em_dashes(body)
+            nl["body"] = body
 
         word_count = len(body.split())
         if not (120 <= word_count <= 180):
@@ -677,7 +679,15 @@ Writing rules per section:
 - Respond with raw JSON only"""
 
         def _validator(d: dict) -> None:
-            d["title"] = _canonical_blog_title(topic, d.get("title", ""))
+            for section in d.get("sections", []):
+                for key in ("title", "content"):
+                    if key in section:
+                        section[key] = _sanitize_em_dashes(section[key])
+            if "sections" in d:
+                d["draft"] = "\n\n".join(s["content"] for s in d["sections"])
+            d["title"] = _canonical_blog_title(
+                topic, _sanitize_em_dashes(d.get("title", ""))
+            )
             d["outline"] = outline
             _validate_blog(d)
 

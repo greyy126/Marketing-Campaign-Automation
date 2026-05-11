@@ -10,13 +10,21 @@ AI-powered content pipeline for NovaMind — a fictional early-stage startup tha
 topic input
   → generate_outline()     structured control layer (5-7 sections with goal + persona_relevance)
   → generate_blog()        section-by-section from the outline
+        └── [GATE 1] User reviews blog in Blog tab
+                ├── Approve → proceed to newsletters
+                └── Redo → re-run generate-blog with optional feedback text
   → generate_newsletters() persona-filtered from outline sections, not full blog summary
+        └── [GATE 2] User reviews newsletters in Newsletters tab
+                ├── Approve → proceed to distribution
+                └── Redo → re-run generate-newsletters with optional feedback text
   → Brevo CRM              contacts upserted, lists created, campaigns created and sent
   → simulate_metrics()     engagement data per persona
   → generate_performance_summary()  AI growth analyst report
 ```
 
 ## Running the agent
+
+### CLI (single-shot)
 
 ```bash
 # Full pipeline (requires ANTHROPIC_API_KEY + BREVO_API_KEY)
@@ -33,6 +41,25 @@ python agent.py history
 
 # Run content generator tests
 python test_content.py
+```
+
+### UI approval flow (human-in-the-loop)
+
+The Streamlit UI (`app.py`) splits the pipeline into three subprocesses with approval gates. These CLI commands are called internally by the UI — they can also be used directly:
+
+```bash
+# Step 1: generate blog only; prints CAMPAIGN_ID: <n> on success
+python agent.py generate-blog --topic "AI in creative automation"
+
+# Step 2: generate newsletters for an approved blog
+python agent.py generate-newsletters --campaign-id <n>
+
+# Optional: pass user feedback to either generation step
+python agent.py generate-blog --topic "..." --feedback "make the tone more conversational"
+python agent.py generate-newsletters --campaign-id <n> --feedback "make Agency Founder version more concise"
+
+# Step 3: distribute an approved campaign (CRM + send + metrics)
+python agent.py distribute --campaign-id <n>
 ```
 
 ## Personas

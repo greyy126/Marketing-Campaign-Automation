@@ -50,12 +50,18 @@ Start the web app:
 streamlit run app.py
 ```
 
-The Streamlit app is the easiest way to demo the project. It lets you:
+The Streamlit app is the easiest way to demo the project. It uses a human-in-the-loop approval flow that breaks the pipeline into three stages with review gates between each:
 
-- trigger a new pipeline run
-- inspect the latest blog and newsletters
+1. **Blog generation** — Claude generates the outline and blog post
+2. **Gate 1** — review the blog in the Blog tab; approve to continue or redo with optional feedback
+3. **Newsletter generation** — Claude generates three persona-specific newsletters
+4. **Gate 2** — review newsletters in the Newsletters tab; approve to send or redo with optional feedback
+5. **Distribution** — contacts sync to Brevo, campaigns are created and sent, baseline metrics are recorded
+
+The app also lets you:
+
 - refresh campaign stats and view the campaign report
-- review the dashboard
+- review the cross-campaign dashboard
 - explore suggested next topics based on prior campaign performance
 
 ## Architecture Overview
@@ -76,7 +82,14 @@ Topic Input
 Content Generation (Anthropic Claude)
    |- generate_outline()
    |- generate_blog()
+   |       `- [GATE 1] User reviews blog in Blog tab
+   |               |- Approve → proceed to newsletters
+   |               `- Redo → re-run generate-blog with optional feedback text
+   |
    `- generate_newsletters()
+           `- [GATE 2] User reviews newsletters in Newsletters tab
+                   |- Approve → proceed to distribution
+                   `- Redo → re-run generate-newsletters with optional feedback text
    |
    v
 Structured Output Saved
@@ -205,6 +218,23 @@ Or use heuristic dashboard insights without Anthropic:
 python agent.py dashboard --mock-ai
 ```
 
+The following commands are used internally by the Streamlit UI approval flow but can also be run directly:
+
+```bash
+# Generate blog only (used by UI at Gate 1)
+python agent.py generate-blog --topic "AI in creative automation"
+
+# Generate newsletters for an approved blog (used by UI at Gate 2)
+python agent.py generate-newsletters --campaign-id <n>
+
+# Pass user feedback to either generation step
+python agent.py generate-blog --topic "..." --feedback "make the tone more conversational"
+python agent.py generate-newsletters --campaign-id <n> --feedback "make Agency Founder version more concise"
+
+# Distribute an approved campaign — CRM setup, send, and metrics (used by UI after Gate 2)
+python agent.py distribute --campaign-id <n>
+```
+
 ## Storage and Outputs
 
 ### Generated Content
@@ -286,11 +316,12 @@ The content layer includes explicit validation rules:
 If you are reviewing the project manually, the fastest path is:
 
 1. install dependencies and configure environment variables
-2. start the Streamlit app
-3. trigger a pipeline run from the Run tab
-4. inspect the generated blog and newsletters
-5. open the Campaign Report tab and refresh stats
-6. open the Dashboard tab to review historical insights and topic suggestions
+2. start the Streamlit app (`streamlit run app.py`)
+3. enter a topic in the Run tab and click **Run Pipeline** (or **Run Mock Pipeline** to skip Claude API costs)
+4. when the blog is ready, review it in the **Blog** tab, then return to Run and click **Approve & Generate Newsletters** (or **Redo Blog** with feedback)
+5. when newsletters are ready, review them in the **Newsletters** tab, then return to Run and click **Approve & Send Campaign** (or **Redo Newsletters** with feedback)
+6. after distribution completes, open the **Campaign Report** tab and click **Refresh Stats**
+7. open the **Dashboard** tab to review cross-campaign insights and next-topic suggestions
 
 ## Additional Notes
 
