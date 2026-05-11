@@ -1759,10 +1759,10 @@ def refresh_dashboard() -> None:
 init_session_state()
 poll_pipeline()
 
-st.set_page_config(page_title="NovaMind Marketing Agent", layout="wide")
+st.set_page_config(page_title="CampaignFlow AI", layout="wide")
 inject_css()
 
-st.title("NovaMind Marketing Agent")
+st.title("CampaignFlow AI")
 st.caption(
     "An end-to-end marketing automation pipeline that generates blogs, sends "
     "persona-targeted campaigns via Brevo, and optimizes content using real "
